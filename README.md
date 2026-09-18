@@ -54,3 +54,26 @@ npm i -D playwright && node scripts/e2e-validate.mjs
 ```
 
 All 33 checks pass on the current build; screenshots land in `.e2e-shots/`.
+
+## Accounts (Firebase Authentication)
+
+The header's **Sign in** button opens a combined sign-in / create-account dialog backed by Firebase Auth
+(`src/lib/firebase.ts`, `src/auth.tsx`): email + password, plus Google sign-in. Two things to know:
+
+- **Google sign-in** needs the site's domain listed under Firebase console → Authentication → Settings →
+  Authorized domains. Email/password works from any origin. The dialog says exactly this when the domain
+  is not authorised rather than failing silently.
+- **Sandboxed hosts** (the private artifact host, for instance) block outbound calls to Google. There the
+  app falls back to a clearly-labelled local demo session so the flow stays explorable, and the account
+  menu says which kind of session you are in.
+
+The Firebase web config is a public client identifier, not a secret — protection comes from the console's
+authorised domains, enabled providers, and security rules. Reviewer access is by email allowlist
+(`ADMIN_EMAILS` in `src/auth.tsx`).
+
+## Reviewer console — a separate document
+
+`admin.html` is its own Vite entry (`src/admin-main.tsx` → `src/pages/AdminApp.tsx`) and is **not linked
+from the public site** — a test asserts the public pages contain no link to it. It holds the operations
+dashboard, the verification queue, lawyer/placement management, the public-user table and the activity log.
+Open it directly at `/admin.html`.

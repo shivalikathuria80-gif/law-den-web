@@ -72,7 +72,7 @@ export const Trust = () => (
       </ul>
 
       <div className="row wrap gap-8" style={{ marginTop: 24 }}>
-        <button className="btn" onClick={() => navigate('/')}>Browse the directory</button>
+        <button className="btn" onClick={() => navigate('/find')}>Browse the directory</button>
         <button className="btn secondary" onClick={() => navigate('/for-lawyers')}>List your practice</button>
       </div>
     </div>

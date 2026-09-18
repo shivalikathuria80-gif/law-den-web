@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
-import { Icon } from './components/ui';
-import { Admin } from './pages/Admin';
+import { useAuth } from './auth';
+import { AuthDialog } from './components/AuthDialog';
+import { Avatar, Icon } from './components/ui';
+import { Landing } from './pages/Landing';
 import { Directory } from './pages/Directory';
 import { ForLawyers } from './pages/ForLawyers';
 import { LawyerProfile } from './pages/LawyerProfile';
@@ -25,7 +27,7 @@ const useTheme = () => {
 };
 
 const NAV = [
-  { href: '#/', label: 'Find a lawyer', short: 'Find', match: 'directory' },
+  { href: '#/find', label: 'Find a lawyer', short: 'Find', match: 'directory' },
   { href: '#/trust', label: 'How it works', short: 'How it works', match: 'trust' },
   { href: '#/for-lawyers', label: 'For lawyers', short: 'Lawyers', match: 'for-lawyers' },
 ];
@@ -33,6 +35,9 @@ const NAV = [
 export const App = () => {
   const route = useRoute();
   const [theme, toggleTheme] = useTheme();
+  const { account, signOut } = useAuth();
+  const [authOpen, setAuthOpen] = useState<null | 'signin' | 'signup'>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   return (
     <>
@@ -52,19 +57,44 @@ export const App = () => {
                 <span className="full">{n.label}</span><span className="short">{n.short}</span>
               </a>
             ))}
-            <a href="#/admin" className={route.name === 'admin' ? 'active' : ''}>Admin</a>
             <button className="icon-btn" onClick={toggleTheme} aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`} style={{ marginLeft: 6 }}>
               {theme === 'dark' ? <Icon.sun size={16} /> : <Icon.moon size={16} />}
             </button>
+            {account ? (
+              <div className="account">
+                <button className="account-chip" onClick={() => setMenuOpen((v) => !v)} aria-expanded={menuOpen} data-testid="account-chip">
+                  <Avatar name={account.name} tone={7} />
+                  <span className="full">{account.name.split(' ')[0]}</span>
+                  <Icon.chevron size={13} />
+                </button>
+                {menuOpen && (
+                  <div className="account-menu card" role="menu">
+                    <div className="stack gap-4" style={{ padding: '10px 12px' }}>
+                      <strong style={{ fontSize: 13.5 }}>{account.name}</strong>
+                      <span className="tiny muted">{account.email}</span>
+                      <span className={`badge ${account.source === 'firebase' ? 'verified' : 'neutral'}`} style={{ alignSelf: 'flex-start', marginTop: 4 }}>
+                        {account.source === 'firebase' ? 'Firebase account' : 'Local demo session'}
+                      </span>
+                    </div>
+                    <hr className="divider" />
+                    <button role="menuitem" onClick={() => { setMenuOpen(false); void signOut(); }} data-testid="sign-out">Sign out</button>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <button className="btn sm" style={{ marginLeft: 8 }} onClick={() => setAuthOpen('signin')} data-testid="sign-in-button">
+                <Icon.user size={15} /> <span className="full">Sign in</span><span className="short">Sign in</span>
+              </button>
+            )}
           </nav>
         </div>
       </header>
 
       <main>
+        {route.name === 'landing' && <Landing />}
         {route.name === 'directory' && <Directory />}
         {route.name === 'lawyer' && <LawyerProfile slug={route.slug} />}
         {route.name === 'for-lawyers' && <ForLawyers />}
-        {route.name === 'admin' && <Admin />}
         {route.name === 'trust' && <Trust />}
       </main>
 
@@ -82,7 +112,7 @@ export const App = () => {
             </div>
             <div>
               <h4>Visitors</h4>
-              <a href="#/">Find a lawyer</a>
+              <a href="#/find">Find a lawyer</a>
               <a href="#/trust">How verification works</a>
               <a href="#/trust">Ranking &amp; promoted placement</a>
             </div>
@@ -90,7 +120,7 @@ export const App = () => {
               <h4>Lawyers</h4>
               <a href="#/for-lawyers">List your practice</a>
               <a href="#/for-lawyers">Submission checklist</a>
-              <a href="#/admin">Admin console</a>
+              <a href="#/trust">What verification covers</a>
             </div>
           </div>
           <div className="footer-note row wrap gap-12">
@@ -101,6 +131,8 @@ export const App = () => {
           </div>
         </div>
       </footer>
+
+      {authOpen && <AuthDialog start={authOpen} onClose={() => setAuthOpen(null)} />}
     </>
   );
 };

@@ -52,7 +52,7 @@ export const LawyerProfile = ({ slug }: { slug: string }) => {
         <div className="empty">
           <h3>Profile not found</h3>
           <p className="muted small" style={{ marginBottom: 16 }}>This profile may have been removed from the directory.</p>
-          <button className="btn secondary" onClick={() => navigate('/')}>Back to the directory</button>
+          <button className="btn secondary" onClick={() => navigate('/find')}>Back to the directory</button>
         </div>
       </div>
     );
@@ -65,7 +65,7 @@ export const LawyerProfile = ({ slug }: { slug: string }) => {
 
   return (
     <div className="shell" style={{ paddingTop: 22 }}>
-      <button className="btn ghost sm" onClick={() => navigate('/')} style={{ marginBottom: 16 }}>
+      <button className="btn ghost sm" onClick={() => navigate('/find')} style={{ marginBottom: 16 }}>
         <Icon.back size={15} /> All lawyers
       </button>
 

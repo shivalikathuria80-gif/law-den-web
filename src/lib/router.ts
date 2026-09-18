@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
 
 export type Route =
+  | { name: 'landing' }
   | { name: 'directory' }
   | { name: 'lawyer'; slug: string }
   | { name: 'for-lawyers' }
-  | { name: 'admin' }
   | { name: 'trust' };
 
 const parse = (hash: string): Route => {
@@ -15,12 +15,12 @@ const parse = (hash: string): Route => {
       return tail ? { name: 'lawyer', slug: tail } : { name: 'directory' };
     case 'for-lawyers':
       return { name: 'for-lawyers' };
-    case 'admin':
-      return { name: 'admin' };
     case 'trust':
       return { name: 'trust' };
-    default:
+    case 'find':
       return { name: 'directory' };
+    default:
+      return { name: 'landing' };
   }
 };
 
