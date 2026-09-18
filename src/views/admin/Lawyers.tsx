@@ -1,7 +1,7 @@
 'use client';
 
-import Link from 'next/link';
 import { useState } from 'react';
+import { AppLink as Link } from '../../components/AppLink';
 import { Avatar, Icon } from '../../components/ui';
 import { inr, longDate } from '../../lib/format';
 import { useStore } from '../../store';

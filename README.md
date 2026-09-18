@@ -94,13 +94,16 @@ lawyer/placement management, the public-user table and the activity log. Open it
 
 ## Private preview build
 
-The preview host serves static files only and reserves paths beginning with `_`:
+The preview host serves static files from a path the build cannot know, and reserves published
+paths beginning with `_`. So the preview is a **single document**: `NEXT_PUBLIC_PREVIEW=1` makes the
+app navigate by hash (see `src/components/AppLink.tsx`), and the script rewrites every asset URL
+relative — including the chunk base compiled into the Turbopack runtime.
 
 ```bash
-ARTIFACT_EXPORT=1 npm run build     # static export into out/
-node scripts/build-preview.mjs      # out-artifact/ + artifact-page.html, host-safe
+NEXT_PUBLIC_PREVIEW=1 ARTIFACT_EXPORT=1 npm run build
+node scripts/build-preview.mjs      # out-artifact/ + artifact-page.html
 ```
 
-Only the seeded profiles are pre-rendered there, so a profile approved during a demo is served by
-`src/app/not-found.tsx`, which renders it client-side from the slug in the URL. None of this affects
-the normal Vercel build.
+The two modes use separate build directories, because `NEXT_PUBLIC_*` values are compiled into the
+output and a shared cache leaks the preview flag into the normal build. None of this affects the
+Vercel build, which keeps real URLs.

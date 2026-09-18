@@ -1,7 +1,7 @@
 'use client';
 
-import Link from 'next/link';
 import { useMemo, useState } from 'react';
+import { AppLink as Link } from '../../components/AppLink';
 import { Avatar, Icon, InfoTip, Modal } from '../../components/ui';
 import type { Submission } from '../../data/types';
 import { inr, longDate } from '../../lib/format';

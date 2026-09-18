@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import Link from 'next/link';
+import { AppLink as Link } from '../components/AppLink';
 import { SiteChrome } from '../components/SiteChrome';
 import { LawyerProfile } from '../views/LawyerProfile';
 

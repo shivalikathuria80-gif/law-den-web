@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, type ReactNode } from 'react';
-import Link from 'next/link';
+import { AppLink as Link } from './AppLink';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '../auth';
 import { AuthDialog } from './AuthDialog';

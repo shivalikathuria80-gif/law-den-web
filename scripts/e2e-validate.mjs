@@ -17,7 +17,11 @@ const check = (name, ok, detail = '') => {
 // terminates TLS at a local proxy. Unset in normal use.
 const browser = await chromium.launch({
   ...(process.env.CHROME_PATH ? { executablePath: process.env.CHROME_PATH } : {}),
-  ...(process.env.PROXY_SERVER ? { proxy: { server: process.env.PROXY_SERVER, bypass: 'localhost,127.0.0.1' } } : {}),
+  // HTTPS_PROXY is picked up automatically so the run does not break when the sandbox
+  // rotates its proxy port; localhost is bypassed so the app itself loads directly.
+  ...((process.env.PROXY_SERVER ?? process.env.HTTPS_PROXY)
+    ? { proxy: { server: (process.env.PROXY_SERVER ?? process.env.HTTPS_PROXY), bypass: 'localhost,127.0.0.1' } }
+    : {}),
   ...(process.env.PROXY_CA_SPKI ? { args: [`--ignore-certificate-errors-spki-list=${process.env.PROXY_CA_SPKI}`] } : {}),
 });
 const ctx = await browser.newContext({ viewport: { width: 1360, height: 900 }, deviceScaleFactor: 2 });

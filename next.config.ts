@@ -12,7 +12,14 @@ const nextConfig: NextConfig = {
   // Next 16 writes AGENTS.md/CLAUDE.md on build; this project keeps its own docs in README.md.
   agentRules: false,
   ...(staticExport
-    ? { output: 'export' as const, trailingSlash: true, images: { unoptimized: true } }
+    ? {
+        output: 'export' as const,
+        trailingSlash: true,
+        images: { unoptimized: true },
+        // A separate build directory: NEXT_PUBLIC_* values are inlined into compiled output,
+        // and sharing .next between the two modes leaks the preview flag into the normal build.
+        distDir: '.next-preview',
+      }
     : {}),
 };
 

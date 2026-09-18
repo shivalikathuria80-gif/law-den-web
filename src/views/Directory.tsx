@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import Link from 'next/link';
+import { AppLink as Link } from '../components/AppLink';
 import { FiltersPanel } from '../components/Filters';
 import { LawyerCard } from '../components/LawyerCard';
 import { Icon, InfoTip } from '../components/ui';
