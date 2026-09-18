@@ -91,3 +91,16 @@ authorised domains, enabled providers, and security rules. Reviewer access is by
 chrome, and is **not linked from anywhere on the site** — two tests assert that, including on the
 submission-confirmation screen. It holds the operations dashboard, the verification queue,
 lawyer/placement management, the public-user table and the activity log. Open it directly at `/admin`.
+
+## Private preview build
+
+The preview host serves static files only and reserves paths beginning with `_`:
+
+```bash
+ARTIFACT_EXPORT=1 npm run build     # static export into out/
+node scripts/build-preview.mjs      # out-artifact/ + artifact-page.html, host-safe
+```
+
+Only the seeded profiles are pre-rendered there, so a profile approved during a demo is served by
+`src/app/not-found.tsx`, which renders it client-side from the slug in the URL. None of this affects
+the normal Vercel build.

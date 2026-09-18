@@ -7,3 +7,5 @@ tsconfig.tsbuildinfo
 *.local
 .DS_Store
 .e2e-shots
+out-artifact
+artifact-page.html
