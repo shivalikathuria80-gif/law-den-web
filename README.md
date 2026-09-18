@@ -39,3 +39,18 @@ src/
   pages/              Directory, LawyerProfile, ForLawyers, Admin, Trust
   components/         UI primitives, lawyer card, filter panel
 ```
+
+## Validating the core flows
+
+`scripts/e2e-validate.mjs` drives the built app in Chromium and asserts the interactions that matter:
+search and every filter, all five sort orders, the promoted-placement rules (a paid slot never enters
+the ranking and hiding it leaves the list identical), review filtering and distribution, the four-step
+submission with its validation guards, the admin passcode gate, checklist-gated approval, publication
+into the directory, mobile layout with no horizontal overflow, and console hygiene.
+
+```bash
+npm run build && npm run preview &     # serves http://localhost:4173
+npm i -D playwright && node scripts/e2e-validate.mjs
+```
+
+All 33 checks pass on the current build; screenshots land in `.e2e-shots/`.
