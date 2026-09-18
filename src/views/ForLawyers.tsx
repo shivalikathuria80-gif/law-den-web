@@ -1,3 +1,5 @@
+'use client';
+
 import { useMemo, useState } from 'react';
 import { Field, Icon, Toast } from '../components/ui';
 import { PRACTICE_AREAS, LANGUAGES } from '../data/seed';
@@ -186,8 +188,8 @@ export const ForLawyers = () => {
           <div className="callout info" style={{ marginTop: 16 }}>
             <Icon.shield size={16} />
             <span>
-              Prototype behaviour: open the <a href="#/admin" style={{ color: 'var(--gold)', fontWeight: 550 }}>admin console</a> to
-              review this submission and see it appear in the public directory once approved.
+              A reviewer checks submissions in a separate console. You will hear back by email once your
+              documents have been looked at.
             </span>
           </div>
           <button className="btn secondary" style={{ marginTop: 18 }} onClick={() => { setSubmittedId(null); setDraft(emptyDraft()); setStep(0); }}>

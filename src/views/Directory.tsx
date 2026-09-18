@@ -1,16 +1,20 @@
+'use client';
+
 import { useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
 import { FiltersPanel } from '../components/Filters';
 import { LawyerCard } from '../components/LawyerCard';
 import { Icon, InfoTip } from '../components/ui';
 import { LANGUAGES } from '../data/seed';
 import { applyFilters, defaultFilters, isDefaultFilters, SORT_LABELS, type Filters, type SortKey } from '../lib/search';
-import { navigate } from '../lib/router';
+import { useNav } from '../lib/nav';
 import { useStore } from '../store';
 
 const QUICK_PICKS = ['Family & Divorce', 'Criminal Defence', 'Property & Real Estate', 'Employment & Labour', 'Consumer Protection', 'Startups & Fundraising'];
 
 export const Directory = () => {
   const { lawyers } = useStore();
+  const nav = useNav();
   const [filters, setFilters] = useState<Filters>(defaultFilters);
   const [showPromoted, setShowPromoted] = useState(true);
   const [panelOpen, setPanelOpen] = useState(false);
@@ -145,7 +149,7 @@ export const Directory = () => {
             <p className="tiny muted" style={{ marginBottom: 16 }}>
               Results are ordered by rating, number of reviews, responsiveness and whether the lawyer is taking new
               clients. Paid placement never changes this order.{' '}
-              <a href="#/trust" style={{ color: 'var(--gold)', fontWeight: 550 }}>How ranking and verification work →</a>
+              <Link href="/trust" style={{ color: 'var(--gold)', fontWeight: 550 }}>How ranking and verification work →</Link>
             </p>
 
             {promoted.length > 0 && showPromoted && (
@@ -202,7 +206,7 @@ export const Directory = () => {
               <span>
                 Are you an advocate? Submit your credentials and the review team will check them before your profile
                 appears here.{' '}
-                <button className="btn ghost sm" onClick={() => navigate('/for-lawyers')}>List your practice →</button>
+                <button className="btn ghost sm" onClick={() => nav('/for-lawyers')}>List your practice →</button>
               </span>
             </div>
           </div>

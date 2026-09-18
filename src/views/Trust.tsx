@@ -1,8 +1,12 @@
+'use client';
+
 import { Icon } from '../components/ui';
-import { navigate } from '../lib/router';
+import { useNav } from '../lib/nav';
 import { VERIFICATION_CHECKS } from '../store';
 
-export const Trust = () => (
+export const Trust = () => {
+  const nav = useNav();
+  return (
   <div className="shell">
     <div className="page-head">
       <h1 className="display">How verification, ranking and promotion work</h1>
@@ -72,9 +76,10 @@ export const Trust = () => (
       </ul>
 
       <div className="row wrap gap-8" style={{ marginTop: 24 }}>
-        <button className="btn" onClick={() => navigate('/find')}>Browse the directory</button>
-        <button className="btn secondary" onClick={() => navigate('/for-lawyers')}>List your practice</button>
+        <button className="btn" onClick={() => nav('/find')}>Browse the directory</button>
+        <button className="btn secondary" onClick={() => nav('/for-lawyers')}>List your practice</button>
       </div>
     </div>
   </div>
 );
+};

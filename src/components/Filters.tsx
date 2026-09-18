@@ -1,3 +1,5 @@
+'use client';
+
 import type { Lawyer } from '../data/types';
 import { compactInr } from '../lib/format';
 import { activeFilterCount, defaultFilters, FEE_CEILING, type Filters as F } from '../lib/search';

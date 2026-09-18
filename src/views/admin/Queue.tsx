@@ -1,3 +1,6 @@
+'use client';
+
+import Link from 'next/link';
 import { useMemo, useState } from 'react';
 import { Avatar, Icon, InfoTip, Modal } from '../../components/ui';
 import type { Submission } from '../../data/types';
@@ -141,9 +144,9 @@ export const Queue = ({ onToast }: { onToast: (m: string) => void }) => {
                 <Icon.check size={16} />
                 <span>
                   Published on {longDate(selected.decidedOn!)}.{' '}
-                  <a className="btn ghost sm" href={`./index.html#/lawyer/${selected.lawyer.slug}`} target="_blank" rel="noreferrer">
+                  <Link className="btn ghost sm" href={`/lawyer/${selected.lawyer.slug}`} target="_blank">
                     View public profile →
-                  </a>
+                  </Link>
                 </span>
               </div>
             ) : (

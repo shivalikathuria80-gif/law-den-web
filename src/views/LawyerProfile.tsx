@@ -1,8 +1,10 @@
+'use client';
+
 import { useMemo, useState } from 'react';
 import { Avatar, Icon, InfoTip, Modal, PromotedBadge, Stars, VerifiedBadge } from '../components/ui';
 import type { Review } from '../data/types';
 import { inr, longDate, relativeDate, responseTime } from '../lib/format';
-import { navigate } from '../lib/router';
+import { useNav } from '../lib/nav';
 import { useStore } from '../store';
 
 const RATING_KEYS = [5, 4, 3, 2, 1] as const;
@@ -35,6 +37,7 @@ const ReviewRow = ({ review }: { review: Review }) => (
 
 export const LawyerProfile = ({ slug }: { slug: string }) => {
   const { lawyers } = useStore();
+  const nav = useNav();
   const lawyer = lawyers.find((l) => l.slug === slug);
   const [tab, setTab] = useState<'about' | 'credentials' | 'reviews'>('about');
   const [reviewFilter, setReviewFilter] = useState(0);
@@ -52,7 +55,7 @@ export const LawyerProfile = ({ slug }: { slug: string }) => {
         <div className="empty">
           <h3>Profile not found</h3>
           <p className="muted small" style={{ marginBottom: 16 }}>This profile may have been removed from the directory.</p>
-          <button className="btn secondary" onClick={() => navigate('/find')}>Back to the directory</button>
+          <button className="btn secondary" onClick={() => nav('/find')}>Back to the directory</button>
         </div>
       </div>
     );
@@ -65,7 +68,7 @@ export const LawyerProfile = ({ slug }: { slug: string }) => {
 
   return (
     <div className="shell" style={{ paddingTop: 22 }}>
-      <button className="btn ghost sm" onClick={() => navigate('/find')} style={{ marginBottom: 16 }}>
+      <button className="btn ghost sm" onClick={() => nav('/find')} style={{ marginBottom: 16 }}>
         <Icon.back size={15} /> All lawyers
       </button>
 

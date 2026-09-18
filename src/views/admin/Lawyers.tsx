@@ -1,3 +1,6 @@
+'use client';
+
+import Link from 'next/link';
 import { useState } from 'react';
 import { Avatar, Icon } from '../../components/ui';
 import { inr, longDate } from '../../lib/format';
@@ -72,7 +75,7 @@ export const Lawyers = ({ onToast }: { onToast: (m: string) => void }) => {
                     </label>
                   </td>
                   <td>
-                    <a className="btn ghost sm" href={`./index.html#/lawyer/${l.slug}`} target="_blank" rel="noreferrer">View →</a>
+                    <Link className="btn ghost sm" href={`/lawyer/${l.slug}`} target="_blank">View →</Link>
                   </td>
                 </tr>
               ))}

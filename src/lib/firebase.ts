@@ -32,6 +32,7 @@ let auth: Auth | null = null;
  * Callers fall back to a clearly-labelled local session when this returns null.
  */
 export const getFirebaseAuth = (): Auth | null => {
+  if (typeof window === 'undefined') return null;   // never initialise during server rendering
   if (auth) return auth;
   try {
     app = app ?? initializeApp(firebaseConfig);

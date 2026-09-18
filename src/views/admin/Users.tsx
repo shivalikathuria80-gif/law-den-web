@@ -1,3 +1,5 @@
+'use client';
+
 import { useMemo, useState } from 'react';
 import { readKnownUsers } from '../../auth';
 import { Avatar, Icon } from '../../components/ui';

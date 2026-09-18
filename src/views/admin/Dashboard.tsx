@@ -1,3 +1,5 @@
+'use client';
+
 import { useMemo } from 'react';
 import { BarList, LineChart, Sparkline, SERIES } from '../../components/charts';
 import { Icon } from '../../components/ui';

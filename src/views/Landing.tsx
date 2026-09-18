@@ -1,7 +1,9 @@
+'use client';
+
 import { useEffect, useRef, useState } from 'react';
 import { Icon } from '../components/ui';
 import { useStore } from '../store';
-import { navigate } from '../lib/router';
+import { useNav } from '../lib/nav';
 import { inr } from '../lib/format';
 
 const SEGMENTS = [
@@ -24,6 +26,7 @@ const PANELS = {
 
 export const Landing = () => {
   const { lawyers } = useStore();
+  const nav = useNav();
   const [segment, setSegment] = useState<'visitors' | 'lawyers'>('visitors');
   const heroRef = useRef<HTMLDivElement>(null);
 
@@ -64,10 +67,10 @@ export const Landing = () => {
                 documents. Compare published fees, ratings and client reviews — and see exactly what every badge means.
               </p>
               <div className="lq-cta">
-                <button className="btn lg" onClick={() => navigate('/find')} data-testid="cta-find">
+                <button className="btn lg" onClick={() => nav('/find')} data-testid="cta-find">
                   <Icon.search size={16} /> Find a lawyer
                 </button>
-                <button className="btn glassy lg" onClick={() => navigate('/for-lawyers')} data-testid="cta-list">
+                <button className="btn glassy lg" onClick={() => nav('/for-lawyers')} data-testid="cta-list">
                   List your practice
                 </button>
               </div>
@@ -103,7 +106,7 @@ export const Landing = () => {
                     </span>
                   </div>
                 ))}
-                <button className="btn block sm" style={{ marginTop: 12 }} onClick={() => navigate('/find')}>
+                <button className="btn block sm" style={{ marginTop: 12 }} onClick={() => nav('/find')}>
                   Open the directory
                 </button>
               </div>
@@ -122,7 +125,7 @@ export const Landing = () => {
           <div className="glass sheen" style={{ padding: 28, marginTop: 16 }}>
             <h2>{panel.title}</h2>
             <p className="sub">{panel.body}</p>
-            <button className="btn" style={{ marginTop: 18 }} onClick={() => navigate(panel.cta.to)}>
+            <button className="btn" style={{ marginTop: 18 }} onClick={() => nav(panel.cta.to)}>
               {panel.cta.label} <Icon.chevron size={15} />
             </button>
           </div>
@@ -187,7 +190,7 @@ export const Landing = () => {
             Promoted lawyers appear in a separate labelled panel you can dismiss in one click — and they keep the
             position their ratings earn in the ranked list. We wrote down exactly how ordering works.
           </p>
-          <button className="btn glassy" onClick={() => navigate('/trust')} data-testid="cta-trust">
+          <button className="btn glassy" onClick={() => nav('/trust')} data-testid="cta-trust">
             Read how ranking works <Icon.chevron size={15} />
           </button>
         </section>

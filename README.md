@@ -18,26 +18,38 @@ verified badge, or any rating. Only verified profiles are eligible. No payments 
 
 ## Stack
 
-Vite + React 19 + TypeScript, hand-written CSS (light/dark), hash routing, `localStorage` persistence.
-No backend: submissions and admin decisions live in the browser, which is what makes the prototype
-end-to-end explorable on a static host.
+Next.js 16 (App Router) + React 19 + TypeScript, hand-written CSS (light/dark), `localStorage`
+persistence. No backend of its own: submissions and admin decisions live in the browser, which is
+what makes the prototype explorable end to end. Deploying to Vercel needs no configuration —
+import the repo, `next build`, done.
 
 ```bash
 npm install
-npm run dev      # http://localhost:5173
-npm run build    # type-check + production build to dist/
-npm run preview
+npm run dev      # http://localhost:3000
+npm run build
+npm start        # production server on :3000
 ```
+
+## Routes
+
+| Route | What it is |
+| --- | --- |
+| `/` | Landing page (liquid-glass treatment) |
+| `/find` | Directory: search, filters, sorting, promoted placements |
+| `/lawyer/[slug]` | Profile: overview, credentials, reviews |
+| `/for-lawyers` | Four-step submission with document attachment |
+| `/admin` | Reviewer console — **not linked from anywhere on the site** |
 
 ## Layout
 
 ```
 src/
-  data/seed.ts        12 verified profiles, ~55 written reviews, 3 queued submissions
-  lib/search.ts       filtering + the organic ranking score (paid placement is not an input)
-  store.tsx           app state, verification checklist, audit log, persistence
-  pages/              Directory, LawyerProfile, ForLawyers, Admin, Trust
-  components/         UI primitives, lawyer card, filter panel
+  app/            App Router: (site) group for public pages, admin/ for the console
+  data/seed.ts    12 verified profiles, ~55 written reviews, 3 queued submissions
+  lib/search.ts   filtering + the organic ranking score (paid placement is not an input)
+  store.tsx       app state, verification checklist, audit log, persistence
+  views/          Landing, Directory, LawyerProfile, ForLawyers, Trust, AdminApp
+  components/     UI primitives, site chrome, lawyer card, filter panel, charts
 ```
 
 ## Validating the core flows
@@ -49,11 +61,12 @@ submission with its validation guards, the admin passcode gate, checklist-gated 
 into the directory, mobile layout with no horizontal overflow, and console hygiene.
 
 ```bash
-npm run build && npm run preview &     # serves http://localhost:4173
+npm run build && npm start &           # serves http://localhost:3000
 npm i -D playwright && node scripts/e2e-validate.mjs
 ```
 
-All 33 checks pass on the current build; screenshots land in `.e2e-shots/`.
+All 54 checks pass on the current build; screenshots land in `.e2e-shots/`. The auth checks create a
+real Firebase account and delete it again at the end of the run.
 
 ## Accounts (Firebase Authentication)
 
@@ -63,17 +76,18 @@ The header's **Sign in** button opens a combined sign-in / create-account dialog
 - **Google sign-in** needs the site's domain listed under Firebase console → Authentication → Settings →
   Authorized domains. Email/password works from any origin. The dialog says exactly this when the domain
   is not authorised rather than failing silently.
-- **Sandboxed hosts** (the private artifact host, for instance) block outbound calls to Google. There the
-  app falls back to a clearly-labelled local demo session so the flow stays explorable, and the account
-  menu says which kind of session you are in.
+- **Sandboxed hosts** (the private artifact host, for instance) block outbound calls to Google. Sign-in
+  then *reports* that Firebase is unreachable and offers an explicit "continue in offline demo mode"
+  button. It never signs you in silently — an earlier version did, which made a wrong password look
+  like a successful sign-in.
 
 The Firebase web config is a public client identifier, not a secret — protection comes from the console's
 authorised domains, enabled providers, and security rules. Reviewer access is by email allowlist
 (`ADMIN_EMAILS` in `src/auth.tsx`).
 
-## Reviewer console — a separate document
+## Reviewer console — separate and unlinked
 
-`admin.html` is its own Vite entry (`src/admin-main.tsx` → `src/pages/AdminApp.tsx`) and is **not linked
-from the public site** — a test asserts the public pages contain no link to it. It holds the operations
-dashboard, the verification queue, lawyer/placement management, the public-user table and the activity log.
-Open it directly at `/admin.html`.
+`/admin` has its own route segment and layout (`src/app/admin/`), shares none of the public site's
+chrome, and is **not linked from anywhere on the site** — two tests assert that, including on the
+submission-confirmation screen. It holds the operations dashboard, the verification queue,
+lawyer/placement management, the public-user table and the activity log. Open it directly at `/admin`.

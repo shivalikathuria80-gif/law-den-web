@@ -1,39 +1,47 @@
-import { useEffect, useState } from 'react';
-import { useAuth } from './auth';
-import { AuthDialog } from './components/AuthDialog';
-import { Avatar, Icon } from './components/ui';
-import { Landing } from './pages/Landing';
-import { Directory } from './pages/Directory';
-import { ForLawyers } from './pages/ForLawyers';
-import { LawyerProfile } from './pages/LawyerProfile';
-import { Trust } from './pages/Trust';
-import { navigate, useRoute } from './lib/router';
+'use client';
+
+import { useEffect, useState, type ReactNode } from 'react';
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+import { useAuth } from '../auth';
+import { AuthDialog } from './AuthDialog';
+import { Avatar, Icon } from './ui';
 
 const THEME_KEY = 'lawden.theme';
 
+/**
+ * Theme resolves after mount: reading localStorage during render would not match the
+ * server-rendered markup. Until then the CSS follows the operating system setting.
+ */
 const useTheme = () => {
-  const [theme, setTheme] = useState<'light' | 'dark'>(() => {
+  const [theme, setTheme] = useState<'light' | 'dark' | null>(null);
+
+  useEffect(() => {
+    let initial: 'light' | 'dark' | null = null;
     try {
       const stored = window.localStorage.getItem(THEME_KEY);
-      if (stored === 'light' || stored === 'dark') return stored;
+      if (stored === 'light' || stored === 'dark') initial = stored;
     } catch { /* storage unavailable */ }
-    return window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-  });
+    setTheme(initial ?? (window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'));
+  }, []);
+
   useEffect(() => {
+    if (!theme) return;
     document.documentElement.dataset.theme = theme;
     try { window.localStorage.setItem(THEME_KEY, theme); } catch { /* ignore */ }
   }, [theme]);
+
   return [theme, () => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))] as const;
 };
 
 const NAV = [
-  { href: '#/find', label: 'Find a lawyer', short: 'Find', match: 'directory' },
-  { href: '#/trust', label: 'How it works', short: 'How it works', match: 'trust' },
-  { href: '#/for-lawyers', label: 'For lawyers', short: 'Lawyers', match: 'for-lawyers' },
+  { href: '/find', label: 'Find a lawyer', short: 'Find' },
+  { href: '/trust', label: 'How it works', short: 'How it works' },
+  { href: '/for-lawyers', label: 'For lawyers', short: 'Lawyers' },
 ];
 
-export const App = () => {
-  const route = useRoute();
+export const SiteChrome = ({ children }: { children: ReactNode }) => {
+  const pathname = usePathname();
   const [theme, toggleTheme] = useTheme();
   const { account, signOut } = useAuth();
   const [authOpen, setAuthOpen] = useState<null | 'signin' | 'signup'>(null);
@@ -47,17 +55,20 @@ export const App = () => {
 
       <header className="site-header">
         <div className="shell inner">
-          <a className="brand" href="#/" aria-label="Law Den home">
+          <Link className="brand" href="/" aria-label="Law Den home">
             <span className="mark"><Icon.scales size={18} /></span>
             <span className="word">Law Den</span>
-          </a>
+          </Link>
           <nav className="nav" aria-label="Main">
             {NAV.map((n) => (
-              <a key={n.href} href={n.href} className={route.name === n.match ? 'active' : ''}>
+              <Link key={n.href} href={n.href} className={pathname === n.href ? 'active' : ''}>
                 <span className="full">{n.label}</span><span className="short">{n.short}</span>
-              </a>
+              </Link>
             ))}
-            <button className="icon-btn" onClick={toggleTheme} aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`} style={{ marginLeft: 6 }}>
+            <button
+              className="icon-btn" onClick={toggleTheme} style={{ marginLeft: 6 }}
+              aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}
+            >
               {theme === 'dark' ? <Icon.sun size={16} /> : <Icon.moon size={16} />}
             </button>
             {account ? (
@@ -90,13 +101,7 @@ export const App = () => {
         </div>
       </header>
 
-      <main>
-        {route.name === 'landing' && <Landing />}
-        {route.name === 'directory' && <Directory />}
-        {route.name === 'lawyer' && <LawyerProfile slug={route.slug} />}
-        {route.name === 'for-lawyers' && <ForLawyers />}
-        {route.name === 'trust' && <Trust />}
-      </main>
+      <main>{children}</main>
 
       <footer className="site-footer">
         <div className="shell">
@@ -112,22 +117,22 @@ export const App = () => {
             </div>
             <div>
               <h4>Visitors</h4>
-              <a href="#/find">Find a lawyer</a>
-              <a href="#/trust">How verification works</a>
-              <a href="#/trust">Ranking &amp; promoted placement</a>
+              <Link href="/find">Find a lawyer</Link>
+              <Link href="/trust">How verification works</Link>
+              <Link href="/trust">Ranking &amp; promoted placement</Link>
             </div>
             <div>
               <h4>Lawyers</h4>
-              <a href="#/for-lawyers">List your practice</a>
-              <a href="#/for-lawyers">Submission checklist</a>
-              <a href="#/trust">What verification covers</a>
+              <Link href="/for-lawyers">List your practice</Link>
+              <Link href="/for-lawyers">Submission checklist</Link>
+              <Link href="/trust">What verification covers</Link>
             </div>
           </div>
           <div className="footer-note row wrap gap-12">
             <span>© 2026 Law Den (prototype). Not a law firm and not a lawyer referral service.</span>
-            <button className="btn ghost sm" style={{ marginLeft: 'auto' }} onClick={() => navigate('/trust')}>
+            <Link className="btn ghost sm" href="/trust" style={{ marginLeft: 'auto' }}>
               Read the transparency notes <Icon.chevron size={13} />
-            </button>
+            </Link>
           </div>
         </div>
       </footer>

@@ -1,3 +1,5 @@
+'use client';
+
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { SEED_LAWYERS, SEED_SUBMISSIONS } from './data/seed';
 import type { AuditEntry, Lawyer, Submission } from './data/types';
@@ -63,15 +65,24 @@ const load = (): PersistedState => {
 const uid = (prefix: string) => `${prefix}-${Math.random().toString(36).slice(2, 9)}`;
 
 export const StoreProvider = ({ children }: { children: ReactNode }) => {
-  const [state, setState] = useState<PersistedState>(load);
+  // Server-rendered markup must match the first client render, so saved state is read
+  // after mount rather than during it.
+  const [state, setState] = useState<PersistedState>(initialState);
+  const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
+    setState(load());
+    setHydrated(true);
+  }, []);
+
+  useEffect(() => {
+    if (!hydrated) return;   // never overwrite saved state with the seed before it is read
     try {
       window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
     } catch {
       /* storage unavailable (private window, blocked cookies) — the prototype still works in-memory */
     }
-  }, [state]);
+  }, [state, hydrated]);
 
   const log = useCallback((action: string, target: string, detail?: string): AuditEntry => ({
     id: uid('a'),

@@ -1,3 +1,5 @@
+'use client';
+
 import { useEffect, useState, type ReactElement } from 'react';
 import { ADMIN_EMAILS, useAuth } from '../auth';
 import { Icon, Toast } from '../components/ui';

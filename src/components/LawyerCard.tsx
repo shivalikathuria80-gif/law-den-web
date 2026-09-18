@@ -1,12 +1,16 @@
+'use client';
+
 import type { Lawyer } from '../data/types';
 import { inr, responseTime } from '../lib/format';
-import { navigate } from '../lib/router';
+import { useNav } from '../lib/nav';
 import { Avatar, Icon, PromotedBadge, Stars, VerifiedBadge } from './ui';
 
-export const LawyerCard = ({ lawyer, showPromotedBadge = false }: { lawyer: Lawyer; showPromotedBadge?: boolean }) => (
+export const LawyerCard = ({ lawyer, showPromotedBadge = false }: { lawyer: Lawyer; showPromotedBadge?: boolean }) => {
+  const nav = useNav();
+  return (
   <button
     className={`lawyer-card${showPromotedBadge ? ' is-promoted' : ''}`}
-    onClick={() => navigate(`/lawyer/${lawyer.slug}`)}
+    onClick={() => nav(`/lawyer/${lawyer.slug}`)}
     data-testid="lawyer-card"
     data-name={lawyer.name}
     aria-label={`View the profile of ${lawyer.name}`}
@@ -58,3 +62,4 @@ export const LawyerCard = ({ lawyer, showPromotedBadge = false }: { lawyer: Lawy
     </div>
   </button>
 );
+};

@@ -1,14 +1,17 @@
+'use client';
+
 import { useState } from 'react';
-import { useAuth } from '../auth';
+import { isUnavailable, useAuth } from '../auth';
 import { Field, Icon, Modal } from './ui';
 
 export const AuthDialog = ({ onClose, start = 'signin' }: { onClose: () => void; start?: 'signin' | 'signup' }) => {
-  const { signIn, signUp, signInWithGoogle, mode } = useAuth();
+  const { signIn, signUp, signInWithGoogle, continueOffline, mode } = useAuth();
   const [tab, setTab] = useState<'signin' | 'signup'>(start);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [unreachable, setUnreachable] = useState(false);
   const [busy, setBusy] = useState(false);
 
   const submit = async (e: React.FormEvent) => {
@@ -18,11 +21,13 @@ export const AuthDialog = ({ onClose, start = 'signin' }: { onClose: () => void;
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return setError('That email address does not look right.');
     if (password.length < 6) return setError('Use at least 6 characters for the password.');
     setBusy(true);
+    setUnreachable(false);
     try {
       if (tab === 'signup') await signUp(name.trim(), email.trim(), password);
       else await signIn(email.trim(), password);
       onClose();
     } catch (err) {
+      if (isUnavailable(err)) setUnreachable(true);
       setError(err instanceof Error ? err.message : 'Sign-in failed. Please try again.');
     } finally {
       setBusy(false);
@@ -31,11 +36,13 @@ export const AuthDialog = ({ onClose, start = 'signin' }: { onClose: () => void;
 
   const google = async () => {
     setError('');
+    setUnreachable(false);
     setBusy(true);
     try {
       await signInWithGoogle();
       onClose();
     } catch (err) {
+      if (isUnavailable(err)) setUnreachable(true);
       setError(err instanceof Error ? err.message : 'Google sign-in failed.');
     } finally {
       setBusy(false);
@@ -74,7 +81,25 @@ export const AuthDialog = ({ onClose, start = 'signin' }: { onClose: () => void;
 
         {error && (
           <div className="callout warn" data-testid="auth-error">
-            <Icon.alert size={16} /><span>{error}</span>
+            <Icon.alert size={16} />
+            <span>
+              {error}
+              {unreachable && (
+                <>
+                  <br />
+                  <button
+                    type="button" className="btn secondary sm" style={{ marginTop: 10 }}
+                    data-testid="auth-offline"
+                    onClick={() => {
+                      continueOffline(name.trim() || email.split('@')[0] || 'Guest', email.trim());
+                      onClose();
+                    }}
+                  >
+                    Continue in offline demo mode
+                  </button>
+                </>
+              )}
+            </span>
           </div>
         )}
 
@@ -97,12 +122,12 @@ export const AuthDialog = ({ onClose, start = 'signin' }: { onClose: () => void;
         Continue with Google
       </button>
 
-      {mode === 'offline' && (
+      {mode === 'offline' && !unreachable && (
         <div className="callout info" style={{ marginTop: 14 }}>
           <Icon.alert size={16} />
           <span>
-            This copy of the site cannot reach Firebase from its current host, so accounts are kept as a local
-            demo session in this browser only. On a normal web host the same form creates a real Firebase account.
+            Firebase was unreachable from this host earlier in this session. Sign-in will report the problem rather
+            than pretending to succeed; an offline demo session is then offered as a deliberate choice.
           </span>
         </div>
       )}

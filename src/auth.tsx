@@ -1,3 +1,5 @@
+'use client';
+
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import {
   authErrorMessage,
@@ -11,6 +13,37 @@ import {
   signInWithPopup,
   updateProfile,
 } from './lib/firebase';
+
+export const UNREACHABLE_CODE = 'auth/unreachable';
+
+const UNREACHABLE_MESSAGE =
+  'Cannot reach Firebase from this page. That usually means the host blocks Google endpoints '
+  + '(the private preview host does) or the network is offline.';
+
+/** How long to wait on Firebase before calling it unreachable. */
+const AUTH_TIMEOUT_MS = 8000;
+
+const unavailable = (): Error => {
+  const error = new Error(UNREACHABLE_MESSAGE);
+  (error as Error & { code?: string }).code = UNREACHABLE_CODE;
+  return error;
+};
+
+export const isUnavailable = (error: unknown): boolean =>
+  typeof error === 'object' && error !== null && (error as { code?: string }).code === UNREACHABLE_CODE;
+
+/** Firebase can hang behind a blocking proxy, so every call is bounded. */
+const withTimeout = async <T,>(work: Promise<T>): Promise<T> => {
+  let timer: number | undefined;
+  try {
+    return await Promise.race([
+      work,
+      new Promise<never>((_, reject) => { timer = window.setTimeout(() => reject(unavailable()), AUTH_TIMEOUT_MS); }),
+    ]);
+  } finally {
+    if (timer !== undefined) window.clearTimeout(timer);
+  }
+};
 
 /** Emails allowed into the admin console when signed in with Firebase. */
 export const ADMIN_EMAILS = ['shivalikathuria80@gmail.com', 'admin@lawden.demo'];
@@ -54,6 +87,8 @@ interface AuthValue {
   signIn: (email: string, password: string) => Promise<void>;
   signInWithGoogle: () => Promise<void>;
   signOut: () => Promise<void>;
+  /** Explicit opt-in to a local demo session when Firebase cannot be reached. */
+  continueOffline: (name: string, email: string) => void;
   isAdmin: boolean;
 }
 
@@ -118,43 +153,56 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try { window.localStorage.setItem(LOCAL_SESSION_KEY, JSON.stringify(next)); } catch { /* ignore */ }
   }, []);
 
+  /**
+   * A failure to reach Firebase is reported, never papered over: silently creating a local
+   * session made a wrong password look like a successful sign-in.
+   */
+  const handleFailure = useCallback((e: unknown): never => {
+    const code = (e as { code?: string }).code ?? '';
+    if (code === UNREACHABLE_CODE || isNetworkError(code)) {
+      setMode('offline');
+      throw unavailable();
+    }
+    throw new Error(authErrorMessage(code));
+  }, []);
+
   const signUp = useCallback(async (name: string, email: string, password: string) => {
     const auth = getFirebaseAuth();
-    if (!auth) return startLocalSession(name, email);
+    if (!auth) throw unavailable();
     try {
-      const cred = await createUserWithEmailAndPassword(auth, email, password);
-      if (name) await updateProfile(cred.user, { displayName: name });
+      const cred = await withTimeout(createUserWithEmailAndPassword(auth, email, password));
+      if (name) {
+        await updateProfile(cred.user, { displayName: name });
+        // onAuthStateChanged may already have fired with an empty display name.
+        setAccount((prev) => (prev && prev.uid === cred.user.uid ? { ...prev, name } : prev));
+      }
       setMode('firebase');
     } catch (e) {
-      const code = (e as { code?: string }).code ?? '';
-      if (isNetworkError(code)) return startLocalSession(name, email);
-      throw new Error(authErrorMessage(code));
+      handleFailure(e);
     }
-  }, [startLocalSession]);
+  }, [handleFailure]);
 
   const signIn = useCallback(async (email: string, password: string) => {
     const auth = getFirebaseAuth();
-    if (!auth) return startLocalSession(email.split('@')[0] ?? 'Member', email);
+    if (!auth) throw unavailable();
     try {
-      await signInWithEmailAndPassword(auth, email, password);
+      await withTimeout(signInWithEmailAndPassword(auth, email, password));
       setMode('firebase');
     } catch (e) {
-      const code = (e as { code?: string }).code ?? '';
-      if (isNetworkError(code)) return startLocalSession(email.split('@')[0] ?? 'Member', email);
-      throw new Error(authErrorMessage(code));
+      handleFailure(e);
     }
-  }, [startLocalSession]);
+  }, [handleFailure]);
 
   const signInWithGoogle = useCallback(async () => {
     const auth = getFirebaseAuth();
-    if (!auth) throw new Error('Google sign-in needs a network connection to Firebase, which this origin blocks.');
+    if (!auth) throw unavailable();
     try {
       await signInWithPopup(auth, new GoogleAuthProvider());
       setMode('firebase');
     } catch (e) {
-      throw new Error(authErrorMessage((e as { code?: string }).code ?? ''));
+      handleFailure(e);
     }
-  }, []);
+  }, [handleFailure]);
 
   const signOut = useCallback(async () => {
     try { window.localStorage.removeItem(LOCAL_SESSION_KEY); } catch { /* ignore */ }
@@ -171,8 +219,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     signIn,
     signInWithGoogle,
     signOut,
+    continueOffline: startLocalSession,
     isAdmin: !!account && ADMIN_EMAILS.includes(account.email.toLowerCase()),
-  }), [account, loading, mode, signUp, signIn, signInWithGoogle, signOut]);
+  }), [account, loading, mode, signUp, signIn, signInWithGoogle, signOut, startLocalSession]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
