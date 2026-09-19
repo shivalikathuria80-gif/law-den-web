@@ -1,7 +1,8 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { Avatar, Icon, InfoTip, Modal, PromotedBadge, Stars, VerifiedBadge } from '../components/ui';
+import { Avatar, Icon, InfoTip, PromotedBadge, Stars, VerifiedBadge } from '../components/ui';
+import { EnquiryDialog } from '../components/EnquiryDialog';
 import type { Review } from '../data/types';
 import { inr, longDate, relativeDate, responseTime } from '../lib/format';
 import { useNav } from '../lib/nav';
@@ -315,19 +316,7 @@ export const LawyerProfile = ({ slug }: { slug: string }) => {
         </aside>
       </div>
 
-      {contactOpen && (
-        <Modal title={`Contact ${lawyer.name}`} onClose={() => setContactOpen(false)}>
-          <p className="muted small" style={{ marginBottom: 14 }}>
-            Messaging is not enabled in this prototype. In the live product this would open an enquiry form and share
-            your contact details with the lawyer only after you confirm.
-          </p>
-          <div className="callout gold">
-            <Icon.alert size={16} />
-            <span>No payment is collected here. Fees are agreed directly between you and the lawyer.</span>
-          </div>
-          <button className="btn block" style={{ marginTop: 16 }} onClick={() => setContactOpen(false)}>Close</button>
-        </Modal>
-      )}
+      {contactOpen && <EnquiryDialog lawyer={lawyer} onClose={() => setContactOpen(false)} />}
     </div>
   );
 };

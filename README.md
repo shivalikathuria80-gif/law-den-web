@@ -38,6 +38,8 @@ npm start        # production server on :3000
 | `/find` | Directory: search, filters, sorting, promoted placements |
 | `/lawyer/[slug]` | Profile: overview, credentials, reviews |
 | `/for-lawyers` | Four-step submission with document attachment |
+| `/enquiries` | A visitor's enquiry threads and replies |
+| `/portal` | Lawyer portal: inbox, reviews, and the profile fields they control |
 | `/admin` | Reviewer console — **not linked from anywhere on the site** |
 
 ## Layout
@@ -65,7 +67,7 @@ npm run build && npm start &           # serves http://localhost:3000
 npm i -D playwright && node scripts/e2e-validate.mjs
 ```
 
-All 69 checks pass on the current build; screenshots land in `.e2e-shots/`. The auth checks create a
+All 84 checks pass on the current build; screenshots land in `.e2e-shots/`. The auth checks create a
 real Firebase account and delete it again at the end of the run.
 
 ## Accounts (Firebase Authentication)
@@ -99,6 +101,28 @@ submission-confirmation screen. Open it directly at `/admin`. It holds:
 | Lawyers | Search and sort, suspend / restore a listing with a reason, and paid placement with an end date |
 | Public users | Accounts with status filters; accounts created on this device are marked |
 | Activity log | Every decision, with actor and detail |
+
+## Enquiries and the lawyer portal
+
+**Request a consultation** on any profile opens a real enquiry: name, email, matter, urgency and a message,
+prefilled when signed in. It lands in the lawyer's inbox at `/portal` and in the visitor's own thread at
+`/enquiries`, and both sides can keep replying until the lawyer closes it.
+
+Enquiries are private. The admin activity log records *that* an enquiry was sent and to whom — never its
+contents — and the console dashboard shows volume only. A test asserts the message body never reaches the log.
+
+The portal (`/portal`) is the lawyer's own side:
+
+- **Overview** — enquiries waiting, rating, fee, availability, and the profile as a visitor reads it.
+- **Enquiries** — the inbox, with reply and close.
+- **Reviews** — one public reply per review, and a dispute that lands in the console's moderation queue.
+  They cannot delete a review; a reviewer decides every dispute.
+- **My profile** — fees, availability, response time, languages, about and highlights. Name, enrolment,
+  credentials and practice areas are not editable here: those were verified. Outcome guarantees
+  ("100% win", "guaranteed") are rejected by the editor.
+
+Sign-in for lawyers is a demo picker — choose any published profile to work as. In production this would be
+the account they verified with.
 
 ### What moderation cannot do
 

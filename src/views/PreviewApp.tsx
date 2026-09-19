@@ -4,10 +4,12 @@ import { useEffect, useState } from 'react';
 import { SiteChrome } from '../components/SiteChrome';
 import { AdminApp } from './AdminApp';
 import { Directory } from './Directory';
+import { Enquiries } from './Enquiries';
 import { ForLawyers } from './ForLawyers';
 import { Landing } from './Landing';
 import { LawyerProfile } from './LawyerProfile';
 import { Trust } from './Trust';
+import { Portal } from './portal/Portal';
 
 /**
  * The preview build ships as a single document, because the private preview host serves it
@@ -21,6 +23,8 @@ const parse = (hash: string) => {
   if (head === 'find') return { name: 'find' as const };
   if (head === 'for-lawyers') return { name: 'for-lawyers' as const };
   if (head === 'trust') return { name: 'trust' as const };
+  if (head === 'enquiries') return { name: 'enquiries' as const };
+  if (head === 'portal') return { name: 'portal' as const };
   return { name: 'landing' as const };
 };
 
@@ -46,6 +50,8 @@ export const PreviewApp = () => {
       {route.name === 'lawyer' && <LawyerProfile slug={route.slug} />}
       {route.name === 'for-lawyers' && <ForLawyers />}
       {route.name === 'trust' && <Trust />}
+      {route.name === 'enquiries' && <Enquiries />}
+      {route.name === 'portal' && <Portal />}
     </SiteChrome>
   );
 };

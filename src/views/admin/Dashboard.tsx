@@ -27,7 +27,7 @@ const RANGES = [
 ] as const;
 
 export const Dashboard = ({ onGo }: { onGo: (section: 'queue' | 'users' | 'lawyers' | 'reviews') => void }) => {
-  const { lawyers, submissions, audit } = useStore();
+  const { lawyers, submissions, audit, enquiries } = useStore();
   const [range, setRange] = useState<(typeof RANGES)[number]['id']>('8');
 
   const weeks = useMemo(() => (range === 'all' ? WEEKS : WEEKS.slice(-Number(range))), [range]);
@@ -188,6 +188,11 @@ export const Dashboard = ({ onGo }: { onGo: (section: 'queue' | 'users' | 'lawye
               { key: 'enq', label: 'Enquiries', color: SERIES.secondary, values: weeks.map((w) => w.enquiries) },
             ]}
           />
+          <p className="tiny muted" style={{ marginTop: 10 }} data-testid="live-enquiries">
+            {enquiries.length} {enquiries.length === 1 ? 'enquiry has' : 'enquiries have'} been sent through this
+            prototype{enquiries.filter((e) => e.status === 'new').length > 0 && `, ${enquiries.filter((e) => e.status === 'new').length} still awaiting a reply`}.
+            Law Den records that an enquiry happened, never what it said.
+          </p>
         </div>
 
         <div className="card chart-card">

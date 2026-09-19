@@ -88,6 +88,11 @@ export const SiteChrome = ({ children }: { children: ReactNode }) => {
                       </span>
                     </div>
                     <hr className="divider" />
+                    <Link role="menuitem" href="/enquiries" onClick={() => setMenuOpen(false)} data-testid="menu-enquiries"
+                      style={{ display: 'block', padding: '11px 12px', fontSize: 13.5 }}>
+                      My enquiries
+                    </Link>
+                    <hr className="divider" />
                     <button role="menuitem" onClick={() => { setMenuOpen(false); void signOut(); }} data-testid="sign-out">Sign out</button>
                   </div>
                 )}
@@ -120,11 +125,12 @@ export const SiteChrome = ({ children }: { children: ReactNode }) => {
               <Link href="/find">Find a lawyer</Link>
               <Link href="/trust">How verification works</Link>
               <Link href="/trust">Ranking &amp; promoted placement</Link>
+              <Link href="/enquiries">My enquiries</Link>
             </div>
             <div>
               <h4>Lawyers</h4>
               <Link href="/for-lawyers">List your practice</Link>
-              <Link href="/for-lawyers">Submission checklist</Link>
+              <Link href="/portal" data-testid="footer-portal">Lawyer portal</Link>
               <Link href="/trust">What verification covers</Link>
             </div>
           </div>

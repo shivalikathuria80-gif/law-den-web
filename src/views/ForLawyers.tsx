@@ -192,9 +192,12 @@ export const ForLawyers = () => {
               documents have been looked at.
             </span>
           </div>
-          <button className="btn secondary" style={{ marginTop: 18 }} onClick={() => { setSubmittedId(null); setDraft(emptyDraft()); setStep(0); }}>
-            Submit another profile
-          </button>
+          <div className="row wrap gap-8" style={{ marginTop: 18 }}>
+            <a className="btn secondary" href="/portal" data-testid="to-portal">Open the lawyer portal</a>
+            <button className="btn ghost" onClick={() => { setSubmittedId(null); setDraft(emptyDraft()); setStep(0); }}>
+              Submit another profile
+            </button>
+          </div>
         </div>
         {toast && <Toast message={toast} />}
       </div>

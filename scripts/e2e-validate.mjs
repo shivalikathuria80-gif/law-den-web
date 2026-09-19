@@ -283,6 +283,118 @@ check('Paid placement does not move the lawyer up the ranked list',
   organicAfterPromo[0] !== 'Rhea Malhotra' && organicAfterPromo.includes('Rhea Malhotra'),
   `rank ${organicAfterPromo.indexOf('Rhea Malhotra') + 1} of ${organicAfterPromo.length}`);
 
+/* ── Enquiry: visitor → lawyer → visitor ──────────────────────────────── */
+await go('/lawyer/kavya-iyer');
+await page.getByTestId('request-consultation').click();
+await page.waitForTimeout(400);
+await page.getByTestId('enquiry-name').fill('Priya Menon');
+await page.getByTestId('enquiry-email').fill('priya.menon@example.com');
+await page.getByTestId('enquiry-message').fill('short');
+await page.getByTestId('enquiry-send').click();
+await page.waitForTimeout(300);
+check('Enquiry form rejects a message with no substance', (await page.locator('.field .error').count()) >= 1);
+
+await page.getByTestId('urgency-urgent').click();
+await page.getByTestId('enquiry-message').fill(
+  'My mediclaim for a hospital stay in March was rejected as a pre-existing condition. I have the policy, the rejection letter and the discharge summary, and the insurer has stopped replying.',
+);
+await page.getByTestId('enquiry-send').click();
+await page.waitForTimeout(600);
+check('Enquiry is confirmed with a reference', await page.getByTestId('enquiry-sent').isVisible());
+await page.keyboard.press('Escape');
+
+await go('/enquiries');
+check('Enquiry appears in the visitor inbox', await page.getByTestId('enquiry-kavya-iyer').isVisible());
+await page.getByTestId('enquiry-kavya-iyer').click();
+await page.waitForTimeout(300);
+const thread = await page.getByTestId('enquiry-thread').textContent();
+check('Visitor thread shows the message and its status', thread.includes('Waiting for a reply') && thread.includes('mediclaim'));
+
+/* ── Lawyer portal: inbox, reply, reviews, profile ────────────────────── */
+await go('/portal');
+await page.getByTestId('portal-as-kavya-iyer').click();
+await page.waitForTimeout(500);
+check('Portal opens on the chosen profile', (await page.locator('h1').first().textContent()).includes('Kavya Iyer'));
+const overview = await page.locator('.kpis').textContent();
+check('Portal overview counts the waiting enquiry', overview.includes('1'), overview.replace(/\s+/g, ' ').slice(0, 80));
+
+await page.getByTestId('portal-tab-enquiries').click();
+await page.waitForTimeout(400);
+check('Lawyer sees the enquiry in their inbox', (await page.getByTestId('portal-thread').textContent()).includes('Priya Menon'));
+await page.getByTestId('portal-reply').fill(
+  'Happy to look at this. Rejections on pre-existing grounds often fail when the policy is over four years old — bring the policy schedule to a 30 minute call.',
+);
+await page.getByTestId('portal-reply-send').click();
+await page.waitForTimeout(600);
+
+await go('/enquiries');
+await page.getByTestId('enquiry-kavya-iyer').click();
+await page.waitForTimeout(400);
+const replied = await page.getByTestId('enquiry-thread').textContent();
+check('Lawyer reply reaches the visitor thread', replied.includes('policy schedule') && replied.includes('Replied'));
+
+// The lawyer's public reply to a review, and a dispute that lands in moderation.
+await go('/portal');
+await page.waitForTimeout(400);
+await page.getByTestId('portal-tab-reviews').click();
+await page.waitForTimeout(400);
+await page.getByTestId('portal-reply-to-r4').click();
+await page.waitForTimeout(300);
+await page.getByTestId('portal-review-reply').fill('Thank you — the commission adjournments were outside our control, but I should have explained that earlier.');
+await page.getByTestId('portal-review-reply-send').click();
+await page.waitForTimeout(500);
+await go('/lawyer/kavya-iyer');
+await page.getByTestId('tab-reviews').click();
+await page.waitForTimeout(400);
+check('Lawyer reply is published on the public profile',
+  (await page.locator('.review .reply').first().textContent()).includes('adjournments'));
+
+await go('/portal');
+await page.waitForTimeout(400);
+await page.getByTestId('portal-tab-reviews').click();
+await page.waitForTimeout(300);
+await page.getByTestId('portal-dispute-r1').click();
+await page.waitForTimeout(300);
+check('Dispute needs grounds spelled out', await page.getByTestId('dispute-send').isDisabled());
+await page.getByTestId('dispute-reason').selectOption('not-a-client');
+await page.getByTestId('dispute-detail').fill('No engagement under this name appears in my records for the period described.');
+await page.getByTestId('dispute-send').click();
+await page.waitForTimeout(500);
+
+// Profile edits the lawyer controls, and the claim rule that blocks guarantees.
+await page.getByTestId('portal-tab-profile').click();
+await page.waitForTimeout(400);
+await page.getByTestId('profile-about').fill('I guarantee a 100% win in every consumer matter I take on, no exceptions whatsoever for any client.');
+await page.getByTestId('profile-save').click();
+await page.waitForTimeout(300);
+check('Outcome guarantees are rejected on the profile editor',
+  (await page.locator('.field .error').first().textContent()).includes('guarantee'));
+await page.getByTestId('profile-about').fill('Consumer complaints and rejected insurance claims, handled end to end so clients rarely attend more than one hearing. Most matters settle at the commission stage.');
+await page.getByTestId('profile-consultation').fill('950');
+await page.getByTestId('profile-save').click();
+await page.waitForTimeout(600);
+await go('/lawyer/kavya-iyer');
+check('Fee change shows on the public profile immediately',
+  (await page.locator('.sticky-card .display').first().textContent()).includes('950'));
+
+/* ── The console sees the dispute and the activity, not the message ───── */
+await page.goto(`${BASE}/admin`, { waitUntil: 'networkidle' });
+await page.getByTestId('admin-pass').fill('lawden-admin');
+await page.getByTestId('admin-unlock').click();
+await page.waitForTimeout(500);
+check('Console reports live enquiry volume', (await page.getByTestId('live-enquiries').textContent()).includes('1 enquiry has been sent'));
+await page.getByTestId('nav-activity').click();
+await page.waitForTimeout(400);
+const logText = await page.locator('.audit').textContent();
+check('Activity log records the enquiry without its contents',
+  logText.includes('Enquiry sent') && logText.includes('Message content is private') && !logText.includes('mediclaim'));
+await page.getByTestId('nav-reviews').click();
+await page.waitForTimeout(400);
+await page.getByTestId('review-filter-flagged').click();
+await page.waitForTimeout(300);
+check('Lawyer dispute reaches the moderation queue',
+  (await page.locator('[data-testid="moderation-list"]').textContent()).includes('Kavya Iyer'));
+
 /* ── Review moderation ────────────────────────────────────────────────── */
 await page.goto(`${BASE}/admin`, { waitUntil: 'networkidle' });
 await page.getByTestId('admin-pass').fill('lawden-admin');
@@ -291,8 +403,9 @@ await page.waitForTimeout(500);
 check('Dashboard surfaces disputed reviews', await page.getByTestId('moderation-callout').isVisible());
 await page.getByTestId('dash-to-reviews').click();
 await page.waitForTimeout(400);
+// Two seeded disputes, plus the one the lawyer raised from their portal earlier in this run.
 const disputed = await page.locator('[data-testid="moderation-list"] article').count();
-check('Moderation queue lists disputed reviews', disputed === 2, `${disputed} disputed`);
+check('Moderation queue lists disputed reviews', disputed === 3, `${disputed} disputed`);
 
 // Removal needs a policy reason and a note; the note gates the confirm button.
 await page.getByTestId('remove-rahul-verma-r4').click();
@@ -325,7 +438,8 @@ await page.getByTestId('moderation-confirm').click();
 await page.waitForTimeout(500);
 await page.getByTestId('review-filter-flagged').click();
 await page.waitForTimeout(300);
-check('Dispute closes without removing the review', (await page.locator('[data-testid="moderation-list"] article').count()) === 0);
+const stillDisputed = await page.locator('[data-testid="moderation-list"]').textContent();
+check('Dispute closes without removing the review', !stillDisputed.includes('Vikram Desai'));
 await go('/lawyer/vikram-desai');
 await page.getByTestId('tab-reviews').click();
 await page.waitForTimeout(400);

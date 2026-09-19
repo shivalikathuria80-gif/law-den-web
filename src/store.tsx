@@ -2,7 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { SEED_LAWYERS, SEED_SUBMISSIONS } from './data/seed';
-import type { AuditEntry, Lawyer, ReviewFlagReason, Submission } from './data/types';
+import type { AuditEntry, Enquiry, EnquiryUrgency, Lawyer, ReviewFlagReason, Submission } from './data/types';
 import { todayIso } from './lib/format';
 
 const STORAGE_KEY = 'lawden.prototype.v1';
@@ -22,7 +22,13 @@ interface PersistedState {
   lawyers: Lawyer[];
   submissions: Submission[];
   audit: AuditEntry[];
+  enquiries: Enquiry[];
 }
+
+/** Fields a lawyer may change on their own profile without going back through review. */
+export type ProfilePatch = Partial<
+  Pick<Lawyer, 'about' | 'highlights' | 'fees' | 'acceptsNewClients' | 'responseTimeHours' | 'languages'>
+>;
 
 export const FLAG_REASONS: { id: ReviewFlagReason; label: string; policy: string }[] = [
   { id: 'not-a-client', label: 'Not a client', policy: 'No engagement can be traced to this reviewer.' },
@@ -47,12 +53,19 @@ interface StoreValue extends PersistedState {
   setPlacement: (lawyerId: string, promoted: boolean, until?: string) => void;
   setListing: (lawyerId: string, listed: boolean, reason: string, note: string) => void;
   moderateReview: (lawyerId: string, reviewId: string, action: 'remove' | 'keep' | 'restore', reason: ReviewFlagReason, note: string) => void;
+  sendEnquiry: (enquiry: Omit<Enquiry, 'id' | 'createdOn' | 'status' | 'messages'> & { message: string }) => Enquiry;
+  replyToEnquiry: (enquiryId: string, from: 'client' | 'lawyer', body: string) => void;
+  closeEnquiry: (enquiryId: string) => void;
+  replyToReview: (lawyerId: string, reviewId: string, body: string) => void;
+  disputeReview: (lawyerId: string, reviewId: string, reason: ReviewFlagReason, detail: string) => void;
+  updateProfile: (lawyerId: string, patch: ProfilePatch) => void;
   resetDemo: () => void;
 }
 
 const StoreContext = createContext<StoreValue | null>(null);
 
 const initialState = (): PersistedState => ({
+  enquiries: [],
   lawyers: SEED_LAWYERS,
   submissions: SEED_SUBMISSIONS,
   audit: [
@@ -73,7 +86,12 @@ const load = (): PersistedState => {
     if (!raw) return initialState();
     const parsed = JSON.parse(raw) as Partial<PersistedState>;
     if (!Array.isArray(parsed.lawyers) || !Array.isArray(parsed.submissions)) return initialState();
-    return { lawyers: parsed.lawyers, submissions: parsed.submissions, audit: parsed.audit ?? [] };
+    return {
+      lawyers: parsed.lawyers,
+      submissions: parsed.submissions,
+      audit: parsed.audit ?? [],
+      enquiries: parsed.enquiries ?? [],
+    };
   } catch {
     return initialState();
   }
@@ -143,6 +161,7 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
       };
       created = lawyer;
       return {
+        ...s,
         lawyers: [lawyer, ...s.lawyers],
         submissions: s.submissions.map((x) =>
           x.id === id ? { ...x, status: 'approved', decidedOn: today, decidedBy: ADMIN_ACTOR, decisionNote: note, checks } : x,
@@ -284,6 +303,107 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
     [log],
   );
 
+  /* ---- Enquiries: private between the visitor and the lawyer ---- */
+
+  const sendEnquiry = useCallback(
+    (input: Omit<Enquiry, 'id' | 'createdOn' | 'status' | 'messages'> & { message: string }) => {
+      const { message, ...rest } = input;
+      const at = new Date().toISOString().slice(0, 16);
+      const enquiry: Enquiry = {
+        ...rest,
+        id: uid('e').toUpperCase(),
+        createdOn: at,
+        status: 'new',
+        messages: [{ from: 'client', body: message, at }],
+      };
+      setState((s) => ({
+        ...s,
+        enquiries: [enquiry, ...s.enquiries],
+        // The log records that an enquiry happened, never what it said.
+        audit: [
+          { ...log('Enquiry sent', enquiry.lawyerName, `Matter: ${enquiry.matter}. Message content is private.`), actor: enquiry.clientEmail },
+          ...s.audit,
+        ],
+      }));
+      return enquiry;
+    },
+    [log],
+  );
+
+  const replyToEnquiry = useCallback((enquiryId: string, from: 'client' | 'lawyer', body: string) => {
+    const at = new Date().toISOString().slice(0, 16);
+    setState((s) => ({
+      ...s,
+      enquiries: s.enquiries.map((e) => (e.id === enquiryId
+        ? { ...e, status: e.status === 'closed' ? 'closed' : from === 'lawyer' ? 'replied' : 'new', messages: [...e.messages, { from, body, at }] }
+        : e)),
+    }));
+  }, []);
+
+  const closeEnquiry = useCallback((enquiryId: string) => {
+    setState((s) => ({
+      ...s,
+      enquiries: s.enquiries.map((e) => (e.id === enquiryId ? { ...e, status: 'closed' } : e)),
+    }));
+  }, []);
+
+  /* ---- The lawyer's own side of their profile ---- */
+
+  /** One public reply per review; it never replaces or hides the review. */
+  const replyToReview = useCallback((lawyerId: string, reviewId: string, body: string) => {
+    setState((s) => ({
+      ...s,
+      lawyers: s.lawyers.map((l) => (l.id === lawyerId
+        ? {
+            ...l,
+            reviews: l.reviews.map((r) => (r.id === reviewId
+              ? { ...r, response: { body, date: todayIso() } }
+              : r)),
+          }
+        : l)),
+    }));
+  }, []);
+
+  /** A lawyer can dispute a review. Only a reviewer can take one down. */
+  const disputeReview = useCallback((lawyerId: string, reviewId: string, reason: ReviewFlagReason, detail: string) => {
+    setState((s) => {
+      const lawyer = s.lawyers.find((l) => l.id === lawyerId);
+      const review = lawyer?.reviews.find((r) => r.id === reviewId);
+      if (!lawyer || !review) return s;
+      return {
+        ...s,
+        lawyers: s.lawyers.map((l) => (l.id === lawyerId
+          ? {
+              ...l,
+              reviews: l.reviews.map((r) => (r.id === reviewId
+                ? { ...r, flag: { reason, raisedBy: lawyer.name, raisedOn: todayIso(), detail } }
+                : r)),
+            }
+          : l)),
+        audit: [
+          { ...log('Review disputed', `${lawyer.name} — review by ${review.author}`, `Reason: ${reason}. Awaiting a moderation decision.`), actor: lawyer.name },
+          ...s.audit,
+        ],
+      };
+    });
+  }, [log]);
+
+  const updateProfile = useCallback((lawyerId: string, patch: ProfilePatch) => {
+    setState((s) => {
+      const lawyer = s.lawyers.find((l) => l.id === lawyerId);
+      if (!lawyer) return s;
+      const changed = Object.keys(patch).join(', ');
+      return {
+        ...s,
+        lawyers: s.lawyers.map((l) => (l.id === lawyerId ? { ...l, ...patch } : l)),
+        audit: [
+          { ...log('Profile updated by the lawyer', lawyer.name, `Changed: ${changed}. Verified credentials are unaffected.`), actor: lawyer.name },
+          ...s.audit,
+        ],
+      };
+    });
+  }, [log]);
+
   const resetDemo = useCallback(() => {
     setState(initialState());
   }, []);
@@ -299,9 +419,19 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
       setPlacement,
       setListing,
       moderateReview,
+      sendEnquiry,
+      replyToEnquiry,
+      closeEnquiry,
+      replyToReview,
+      disputeReview,
+      updateProfile,
       resetDemo,
     }),
-    [state, addSubmission, approveSubmission, requestChanges, rejectSubmission, togglePromoted, setPlacement, setListing, moderateReview, resetDemo],
+    [
+      state, addSubmission, approveSubmission, requestChanges, rejectSubmission, togglePromoted,
+      setPlacement, setListing, moderateReview, sendEnquiry, replyToEnquiry, closeEnquiry,
+      replyToReview, disputeReview, updateProfile, resetDemo,
+    ],
   );
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;

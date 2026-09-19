@@ -120,6 +120,36 @@ export interface Submission {
   >;
 }
 
+export type EnquiryStatus = 'new' | 'replied' | 'closed';
+
+export type EnquiryUrgency = 'urgent' | 'soon' | 'planning';
+
+export interface EnquiryMessage {
+  from: 'client' | 'lawyer';
+  body: string;
+  at: string;
+}
+
+/**
+ * An enquiry is private between the visitor and the lawyer. The admin activity log records
+ * that one was sent, never what it said.
+ */
+export interface Enquiry {
+  id: string;
+  lawyerId: string;
+  lawyerSlug: string;
+  lawyerName: string;
+  clientName: string;
+  clientEmail: string;
+  /** Set when the visitor was signed in, so their enquiries follow the account. */
+  clientUid?: string;
+  matter: string;
+  urgency: EnquiryUrgency;
+  createdOn: string;
+  status: EnquiryStatus;
+  messages: EnquiryMessage[];
+}
+
 export interface AuditEntry {
   id: string;
   at: string;
