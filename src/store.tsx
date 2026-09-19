@@ -80,18 +80,46 @@ const initialState = (): PersistedState => ({
   ],
 });
 
+/**
+ * Saved state can predate fields added in a later build. Fill those in rather than dropping
+ * the record: a lawyer stored before `listed` existed would otherwise read as unlisted and
+ * vanish from the directory.
+ */
+const migrate = (parsed: Partial<PersistedState>): PersistedState => {
+  const lawyers = (parsed.lawyers ?? []).map((stored) => {
+    const l = stored as Partial<Lawyer> & { id: string };
+    return {
+      ...(l as Lawyer),
+      listed: l.listed ?? true,
+      promoted: l.promoted ?? false,
+      reviews: l.reviews ?? [],
+      highlights: l.highlights ?? [],
+      credentials: l.credentials ?? [],
+      languages: l.languages ?? [],
+      practiceAreas: l.practiceAreas ?? [],
+      courts: l.courts ?? [],
+      education: l.education ?? [],
+    };
+  });
+
+  return {
+    lawyers,
+    submissions: parsed.submissions ?? [],
+    audit: parsed.audit ?? [],
+    enquiries: parsed.enquiries ?? [],
+  };
+};
+
 const load = (): PersistedState => {
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (!raw) return initialState();
     const parsed = JSON.parse(raw) as Partial<PersistedState>;
     if (!Array.isArray(parsed.lawyers) || !Array.isArray(parsed.submissions)) return initialState();
-    return {
-      lawyers: parsed.lawyers,
-      submissions: parsed.submissions,
-      audit: parsed.audit ?? [],
-      enquiries: parsed.enquiries ?? [],
-    };
+    // An empty directory means the save is unusable; fall back to the seed rather than
+    // showing a site with no lawyers in it.
+    const migrated = migrate(parsed);
+    return migrated.lawyers.length ? migrated : initialState();
   } catch {
     return initialState();
   }

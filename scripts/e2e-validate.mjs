@@ -283,6 +283,37 @@ check('Paid placement does not move the lawyer up the ranked list',
   organicAfterPromo[0] !== 'Rhea Malhotra' && organicAfterPromo.includes('Rhea Malhotra'),
   `rank ${organicAfterPromo.indexOf('Rhea Malhotra') + 1} of ${organicAfterPromo.length}`);
 
+/* ── Saved state from an older build ──────────────────────────────────── */
+// Reproduces what a returning visitor hits: records saved before `listed`, `promoted`,
+// `reviews` and `enquiries` existed. They must be migrated, not dropped.
+await go('/find');
+await page.evaluate(() => {
+  const raw = window.localStorage.getItem('lawden.prototype.v1');
+  const state = JSON.parse(raw);
+  state.lawyers = state.lawyers.slice(0, 5).map((l) => {
+    const { listed, promoted, reviews, ...rest } = l;   // strip newer fields
+    return rest;
+  });
+  delete state.enquiries;
+  window.localStorage.setItem('lawden.prototype.v1', JSON.stringify(state));
+});
+await go('/find');
+const migrated = await names('[data-testid="results"] [data-testid="lawyer-card"]');
+check('Profiles saved before the listing flag still appear', migrated.length === 5, `${migrated.length} listed`);
+await go('/lawyer/anaya-rao');
+await page.getByTestId('tab-reviews').click();
+await page.waitForTimeout(400);
+check('A migrated profile opens without its missing fields breaking the page',
+  (await page.locator('h1').first().textContent()).includes('Anaya Rao'));
+
+// Unusable saved state falls back to the seed rather than an empty directory.
+await page.evaluate(() => window.localStorage.setItem('lawden.prototype.v1', JSON.stringify({ lawyers: [], submissions: [] })));
+await go('/find');
+const recovered = await names('[data-testid="results"] [data-testid="lawyer-card"]');
+check('An empty saved directory falls back to the seed data', recovered.length === 12, `${recovered.length} listed`);
+await page.evaluate(() => window.localStorage.removeItem('lawden.prototype.v1'));
+await go('/find');
+
 /* ── Enquiry: visitor → lawyer → visitor ──────────────────────────────── */
 await go('/lawyer/kavya-iyer');
 await page.getByTestId('request-consultation').click();
