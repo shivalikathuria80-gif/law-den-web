@@ -2,7 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { SEED_LAWYERS, SEED_SUBMISSIONS } from './data/seed';
-import type { AuditEntry, Lawyer, Submission } from './data/types';
+import type { AuditEntry, Lawyer, ReviewFlagReason, Submission } from './data/types';
 import { todayIso } from './lib/format';
 
 const STORAGE_KEY = 'lawden.prototype.v1';
@@ -24,12 +24,29 @@ interface PersistedState {
   audit: AuditEntry[];
 }
 
+export const FLAG_REASONS: { id: ReviewFlagReason; label: string; policy: string }[] = [
+  { id: 'not-a-client', label: 'Not a client', policy: 'No engagement can be traced to this reviewer.' },
+  { id: 'abusive', label: 'Abusive or personal', policy: 'Personal abuse rather than an account of the work.' },
+  { id: 'confidential', label: 'Confidential detail', policy: 'Discloses details of a live matter or a third party.' },
+  { id: 'conflict-of-interest', label: 'Conflict of interest', policy: 'Posted by a competitor or someone connected to one.' },
+];
+
+export const SUSPENSION_REASONS = [
+  'Credentials no longer verifiable',
+  'Disciplinary proceeding disclosed',
+  'Misleading claims on the profile',
+  'Requested by the lawyer',
+] as const;
+
 interface StoreValue extends PersistedState {
   addSubmission: (submission: Submission) => void;
   approveSubmission: (id: string, checks: Record<string, boolean>, note: string) => Lawyer | null;
   requestChanges: (id: string, note: string, checks: Record<string, boolean>) => void;
   rejectSubmission: (id: string, note: string, checks: Record<string, boolean>) => void;
   togglePromoted: (lawyerId: string) => void;
+  setPlacement: (lawyerId: string, promoted: boolean, until?: string) => void;
+  setListing: (lawyerId: string, listed: boolean, reason: string, note: string) => void;
+  moderateReview: (lawyerId: string, reviewId: string, action: 'remove' | 'keep' | 'restore', reason: ReviewFlagReason, note: string) => void;
   resetDemo: () => void;
 }
 
@@ -117,6 +134,7 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
         verifiedOn: today,
         verifiedBy: ADMIN_ACTOR,
         promoted: false,
+        listed: true,
         rating: null,
         reviewCount: 0,
         ratingBreakdown: { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 },
@@ -161,13 +179,34 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
   const rejectSubmission = useCallback((id: string, note: string, checks: Record<string, boolean>) =>
     decide(id, 'rejected', note, checks), [decide]);
 
+  /** Placement is a paid slot with an end date. Only a verified, listed profile is eligible. */
+  const setPlacement = useCallback((lawyerId: string, promoted: boolean, until?: string) => {
+    setState((s) => {
+      const lawyer = s.lawyers.find((l) => l.id === lawyerId);
+      if (!lawyer) return s;
+      if (promoted && (!lawyer.verified || !lawyer.listed)) return s;
+      return {
+        ...s,
+        lawyers: s.lawyers.map((l) => (l.id === lawyerId ? { ...l, promoted, promotedUntil: promoted ? until : undefined } : l)),
+        audit: [
+          log(promoted ? 'Premium placement added' : 'Premium placement removed', lawyer.name,
+            promoted
+              ? `Runs to ${until ?? 'no end date'}. Labelled on the directory; organic ranking unchanged.`
+              : 'Profile returns to standard listing.'),
+          ...s.audit,
+        ],
+      };
+    });
+  }, [log]);
+
   const togglePromoted = useCallback((lawyerId: string) => {
     setState((s) => {
       const lawyer = s.lawyers.find((l) => l.id === lawyerId);
       if (!lawyer) return s;
+      if (!lawyer.promoted && (!lawyer.verified || !lawyer.listed)) return s;
       return {
         ...s,
-        lawyers: s.lawyers.map((l) => (l.id === lawyerId ? { ...l, promoted: !l.promoted } : l)),
+        lawyers: s.lawyers.map((l) => (l.id === lawyerId ? { ...l, promoted: !l.promoted, promotedUntil: undefined } : l)),
         audit: [
           log(lawyer.promoted ? 'Premium placement removed' : 'Premium placement added', lawyer.name,
             'Placement is labelled on the directory and never changes organic ranking.'),
@@ -177,13 +216,92 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
     });
   }, [log]);
 
+  /** Suspending takes a profile out of the directory; the record and its history stay. */
+  const setListing = useCallback((lawyerId: string, listed: boolean, reason: string, note: string) => {
+    setState((s) => {
+      const lawyer = s.lawyers.find((l) => l.id === lawyerId);
+      if (!lawyer) return s;
+      const at = new Date().toISOString().slice(0, 16);
+      return {
+        ...s,
+        lawyers: s.lawyers.map((l) => (l.id === lawyerId
+          ? {
+              ...l,
+              listed,
+              // A suspended profile cannot hold a paid slot.
+              promoted: listed ? l.promoted : false,
+              promotedUntil: listed ? l.promotedUntil : undefined,
+              suspension: listed ? undefined : { reason, note, at, by: ADMIN_ACTOR },
+            }
+          : l)),
+        audit: [log(listed ? 'Listing restored' : 'Listing suspended', lawyer.name, listed ? note || 'Profile is public again.' : `${reason}. ${note}`.trim()), ...s.audit],
+      };
+    });
+  }, [log]);
+
+  /**
+   * Moderation is recorded, not silent: removing a review needs a policy reason, and the
+   * profile keeps a visible note that a review was removed.
+   */
+  const moderateReview = useCallback(
+    (lawyerId: string, reviewId: string, action: 'remove' | 'keep' | 'restore', reason: ReviewFlagReason, note: string) => {
+      setState((s) => {
+        const lawyer = s.lawyers.find((l) => l.id === lawyerId);
+        const review = lawyer?.reviews.find((r) => r.id === reviewId);
+        if (!lawyer || !review) return s;
+        const decidedOn = todayIso();
+        return {
+          ...s,
+          lawyers: s.lawyers.map((l) => (l.id === lawyerId
+            ? {
+                ...l,
+                reviews: l.reviews.map((r) => (r.id === reviewId
+                  ? {
+                      ...r,
+                      flag: action === 'keep' ? undefined : r.flag,
+                      moderation: action === 'remove'
+                        ? { status: 'removed' as const, reason, note, decidedOn, decidedBy: ADMIN_ACTOR }
+                        : undefined,
+                    }
+                  : r)),
+              }
+            : l)),
+          audit: [
+            log(
+              action === 'remove' ? 'Review removed' : action === 'restore' ? 'Review restored' : 'Review kept published',
+              `${lawyer.name} — review by ${review.author}`,
+              action === 'keep'
+                ? `Flag dismissed: the review stays published. ${note}`.trim()
+                : action === 'restore'
+                  ? `Review is public again. ${note}`.trim()
+                  : `Reason: ${reason}. ${note}`.trim(),
+            ),
+            ...s.audit,
+          ],
+        };
+      });
+    },
+    [log],
+  );
+
   const resetDemo = useCallback(() => {
     setState(initialState());
   }, []);
 
   const value = useMemo<StoreValue>(
-    () => ({ ...state, addSubmission, approveSubmission, requestChanges, rejectSubmission, togglePromoted, resetDemo }),
-    [state, addSubmission, approveSubmission, requestChanges, rejectSubmission, togglePromoted, resetDemo],
+    () => ({
+      ...state,
+      addSubmission,
+      approveSubmission,
+      requestChanges,
+      rejectSubmission,
+      togglePromoted,
+      setPlacement,
+      setListing,
+      moderateReview,
+      resetDemo,
+    }),
+    [state, addSubmission, approveSubmission, requestChanges, rejectSubmission, togglePromoted, setPlacement, setListing, moderateReview, resetDemo],
   );
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;

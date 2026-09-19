@@ -271,8 +271,10 @@ await page.getByTestId('admin-unlock').click();
 await page.waitForTimeout(400);
 await page.getByTestId('nav-lawyers').click();
 await page.waitForTimeout(300);
-await page.getByTestId('promote-rhea-malhotra').check();
-await page.waitForTimeout(400);
+await page.getByTestId('placement-rhea-malhotra').click();
+await page.waitForTimeout(300);
+await page.getByTestId('placement-start').click();   // default run is 30 days out
+await page.waitForTimeout(500);
 await go('/find');
 const promotedAfter = await names('[data-testid="promoted-strip"] [data-testid="lawyer-card"]');
 check('Placement granted in the console shows in the labelled promoted box', promotedAfter.includes('Rhea Malhotra'), promotedAfter.join(', '));
@@ -280,6 +282,113 @@ const organicAfterPromo = await names('[data-testid="results"] [data-testid="law
 check('Paid placement does not move the lawyer up the ranked list',
   organicAfterPromo[0] !== 'Rhea Malhotra' && organicAfterPromo.includes('Rhea Malhotra'),
   `rank ${organicAfterPromo.indexOf('Rhea Malhotra') + 1} of ${organicAfterPromo.length}`);
+
+/* ── Review moderation ────────────────────────────────────────────────── */
+await page.goto(`${BASE}/admin`, { waitUntil: 'networkidle' });
+await page.getByTestId('admin-pass').fill('lawden-admin');
+await page.getByTestId('admin-unlock').click();
+await page.waitForTimeout(500);
+check('Dashboard surfaces disputed reviews', await page.getByTestId('moderation-callout').isVisible());
+await page.getByTestId('dash-to-reviews').click();
+await page.waitForTimeout(400);
+const disputed = await page.locator('[data-testid="moderation-list"] article').count();
+check('Moderation queue lists disputed reviews', disputed === 2, `${disputed} disputed`);
+
+// Removal needs a policy reason and a note; the note gates the confirm button.
+await page.getByTestId('remove-rahul-verma-r4').click();
+await page.waitForTimeout(300);
+check('Removal is blocked until a reviewer note is written', await page.getByTestId('moderation-confirm').isDisabled());
+await page.getByTestId('moderation-reason').selectOption('not-a-client');
+await page.getByTestId('moderation-note').fill('No engagement found under this name in the platform record.');
+await page.getByTestId('moderation-confirm').click();
+await page.waitForTimeout(600);
+
+await go('/lawyer/rahul-verma');
+await page.getByTestId('tab-reviews').click();
+await page.waitForTimeout(400);
+const afterRemoval = await page.getByTestId('review').count();
+check('Removed review no longer appears on the profile', afterRemoval === 3, `${afterRemoval} reviews shown`);
+check('Profile still discloses that a review was removed', await page.getByTestId('removed-notice').isVisible());
+const ratingAfter = await page.locator('.big-rating .n').textContent();
+check('Removing a review does not raise the published rating', ratingAfter.trim() === '4.3', `rating ${ratingAfter}`);
+
+// Keeping a disputed review closes the dispute without touching the review.
+await page.goto(`${BASE}/admin`, { waitUntil: 'networkidle' });
+await page.getByTestId('admin-pass').fill('lawden-admin');
+await page.getByTestId('admin-unlock').click();
+await page.waitForTimeout(400);
+await page.getByTestId('nav-reviews').click();
+await page.waitForTimeout(400);
+await page.getByTestId('keep-vikram-desai-r4').click();
+await page.getByTestId('moderation-note').fill('Matter is closed; the review describes the service, not confidential detail.');
+await page.getByTestId('moderation-confirm').click();
+await page.waitForTimeout(500);
+await page.getByTestId('review-filter-flagged').click();
+await page.waitForTimeout(300);
+check('Dispute closes without removing the review', (await page.locator('[data-testid="moderation-list"] article').count()) === 0);
+await go('/lawyer/vikram-desai');
+await page.getByTestId('tab-reviews').click();
+await page.waitForTimeout(400);
+check('Kept review stays published on the profile', (await page.getByTestId('review').count()) === 4);
+
+/* ── Listing suspension and placement eligibility ─────────────────────── */
+await page.goto(`${BASE}/admin`, { waitUntil: 'networkidle' });
+await page.getByTestId('admin-pass').fill('lawden-admin');
+await page.getByTestId('admin-unlock').click();
+await page.waitForTimeout(400);
+await page.getByTestId('nav-lawyers').click();
+await page.waitForTimeout(400);
+await page.getByTestId('lawyer-sort').selectOption('rating');
+await page.waitForTimeout(300);
+const sortedNames = await page.locator('[data-testid="lawyers-table"] tr td:first-child strong').allTextContents();
+check('Lawyer table sorts by rating', sortedNames[0] === 'Sunita Menon', sortedNames.slice(0, 3).join(', '));
+
+await page.getByTestId('suspend-tenzin-dorji').click();
+await page.waitForTimeout(300);
+check('Suspension is blocked until a note is written', await page.getByTestId('suspend-confirm').isDisabled());
+await page.getByTestId('suspend-note').fill('Bar council record could not be re-confirmed at annual re-check.');
+await page.getByTestId('suspend-confirm').click();
+await page.waitForTimeout(600);
+
+await go('/find');
+const listedAfterSuspension = await names('[data-testid="results"] [data-testid="lawyer-card"]');
+check('Suspended profile leaves the directory', !listedAfterSuspension.includes('Tenzin Dorji'), `${listedAfterSuspension.length} listed`);
+await go('/lawyer/tenzin-dorji');
+check('Suspended profile says so on its own page', await page.getByTestId('suspended-notice').isVisible());
+
+await page.goto(`${BASE}/admin`, { waitUntil: 'networkidle' });
+await page.getByTestId('admin-pass').fill('lawden-admin');
+await page.getByTestId('admin-unlock').click();
+await page.waitForTimeout(400);
+await page.getByTestId('nav-lawyers').click();
+await page.waitForTimeout(400);
+await page.getByTestId('placement-tenzin-dorji').click();
+await page.waitForTimeout(300);
+check('A suspended profile cannot be sold placement', await page.getByTestId('placement-blocked').isVisible());
+await page.keyboard.press('Escape');
+await page.getByTestId('restore-tenzin-dorji').click();
+await page.getByTestId('restore-note').fill('Enrolment re-confirmed with the bar council.');
+await page.getByTestId('restore-confirm').click();
+await page.waitForTimeout(600);
+await go('/find');
+check('Restored profile returns to the directory',
+  (await names('[data-testid="results"] [data-testid="lawyer-card"]')).includes('Tenzin Dorji'));
+
+/* ── Placement with an end date ───────────────────────────────────────── */
+await page.goto(`${BASE}/admin`, { waitUntil: 'networkidle' });
+await page.getByTestId('admin-pass').fill('lawden-admin');
+await page.getByTestId('admin-unlock').click();
+await page.waitForTimeout(400);
+await page.getByTestId('nav-lawyers').click();
+await page.waitForTimeout(400);
+await page.getByTestId('placement-kavya-iyer').click();
+await page.waitForTimeout(300);
+await page.getByTestId('placement-until').fill('2020-01-01');   // already past
+await page.getByTestId('placement-start').click();
+await page.waitForTimeout(600);
+await go('/find');
+const promotedNow = await names('[data-testid="promoted-strip"] [data-testid="lawyer-card"]');
+check('Placement past its end date is not promoted', !promotedNow.includes('Kavya Iyer'), promotedNow.join(', '));
 
 /* ── Presentation ─────────────────────────────────────────────────────── */
 await page.locator('.icon-btn').first().click();

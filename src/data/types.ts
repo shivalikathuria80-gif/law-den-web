@@ -20,6 +20,27 @@ export interface Credential {
   note?: string;
 }
 
+export type ReviewFlagReason = 'not-a-client' | 'abusive' | 'confidential' | 'conflict-of-interest';
+
+export interface ReviewFlag {
+  reason: ReviewFlagReason;
+  raisedBy: string;
+  raisedOn: string;
+  detail: string;
+}
+
+/**
+ * A removed review leaves a visible trace on the profile: moderation never quietly improves
+ * a rating, and a lawyer cannot make a bad review disappear without a stated policy reason.
+ */
+export interface ReviewModeration {
+  status: 'removed';
+  reason: ReviewFlagReason;
+  note: string;
+  decidedOn: string;
+  decidedBy: string;
+}
+
 export interface Review {
   id: string;
   author: string;
@@ -31,6 +52,9 @@ export interface Review {
   verifiedClient: boolean;
   helpful: number;
   response?: { body: string; date: string };
+  /** Raised by the lawyer; waiting on a reviewer decision. */
+  flag?: ReviewFlag;
+  moderation?: ReviewModeration;
 }
 
 export interface Fees {
@@ -70,6 +94,11 @@ export interface Lawyer {
   acceptsNewClients: boolean;
   /** Paid placement. Never changes organic ordering — rendered in a separate, labelled row. */
   promoted: boolean;
+  /** Placement runs to this date; past it the profile is treated as standard again. */
+  promotedUntil?: string;
+  /** A suspended profile leaves the directory but keeps its record and its audit trail. */
+  listed: boolean;
+  suspension?: { reason: string; note: string; at: string; by: string };
   addedOn: string;
   tone: number;
 }
@@ -85,7 +114,10 @@ export interface Submission {
   decisionNote?: string;
   /** Admin checklist state, keyed by check id. */
   checks: Record<string, boolean>;
-  lawyer: Omit<Lawyer, 'reviews' | 'rating' | 'reviewCount' | 'ratingBreakdown' | 'verified' | 'promoted'>;
+  lawyer: Omit<
+    Lawyer,
+    'reviews' | 'rating' | 'reviewCount' | 'ratingBreakdown' | 'verified' | 'promoted' | 'promotedUntil' | 'listed' | 'suspension'
+  >;
 }
 
 export interface AuditEntry {

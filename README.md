@@ -65,7 +65,7 @@ npm run build && npm start &           # serves http://localhost:3000
 npm i -D playwright && node scripts/e2e-validate.mjs
 ```
 
-All 54 checks pass on the current build; screenshots land in `.e2e-shots/`. The auth checks create a
+All 69 checks pass on the current build; screenshots land in `.e2e-shots/`. The auth checks create a
 real Firebase account and delete it again at the end of the run.
 
 ## Accounts (Firebase Authentication)
@@ -89,8 +89,28 @@ authorised domains, enabled providers, and security rules. Reviewer access is by
 
 `/admin` has its own route segment and layout (`src/app/admin/`), shares none of the public site's
 chrome, and is **not linked from anywhere on the site** — two tests assert that, including on the
-submission-confirmation screen. It holds the operations dashboard, the verification queue,
-lawyer/placement management, the public-user table and the activity log. Open it directly at `/admin`.
+submission-confirmation screen. Open it directly at `/admin`. It holds:
+
+| Section | What it does |
+| --- | --- |
+| Dashboard | KPIs, a verification funnel with clearance rate, submission/sign-up trends over a selectable range, coverage and rating spread, and a decision queue whose items open the right section |
+| Verification queue | Submitted details and documents, a six-point checklist that gates approval, and request-changes / reject with a recorded note |
+| Review moderation | Disputed reviews, kept or removed against a **policy reason** with a required note |
+| Lawyers | Search and sort, suspend / restore a listing with a reason, and paid placement with an end date |
+| Public users | Accounts with status filters; accounts created on this device are marked |
+| Activity log | Every decision, with actor and detail |
+
+### What moderation cannot do
+
+A lawyer can dispute a review; they cannot remove one. Removal requires one of four policy reasons
+(not a client, abusive, confidential detail, conflict of interest) plus a reviewer note, and the
+profile keeps a visible line saying a review was removed — the rating still counts every review
+received, so moderation can never quietly raise a score. Disagreeing with a rating is not a reason,
+and the console says so on the page.
+
+Suspending a profile removes it from the directory, ends any paid placement immediately, and shows a
+notice on the profile itself; the record, reviews and verification history are kept. Placement
+lapses on its end date on its own and can never be sold to an unverified or suspended profile.
 
 ## Private preview build
 

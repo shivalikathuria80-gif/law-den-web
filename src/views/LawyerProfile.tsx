@@ -43,11 +43,13 @@ export const LawyerProfile = ({ slug }: { slug: string }) => {
   const [reviewFilter, setReviewFilter] = useState(0);
   const [contactOpen, setContactOpen] = useState(false);
 
+  const published = useMemo(() => (lawyer ? lawyer.reviews.filter((r) => !r.moderation) : []), [lawyer]);
+  const removedCount = lawyer ? lawyer.reviews.length - published.length : 0;
+
   const visibleReviews = useMemo(() => {
-    if (!lawyer) return [];
-    const sorted = [...lawyer.reviews].sort((a, b) => b.date.localeCompare(a.date));
+    const sorted = [...published].sort((a, b) => b.date.localeCompare(a.date));
     return reviewFilter === 0 ? sorted : sorted.filter((r) => Math.floor(r.rating) === reviewFilter);
-  }, [lawyer, reviewFilter]);
+  }, [published, reviewFilter]);
 
   if (!lawyer) {
     return (
@@ -62,8 +64,8 @@ export const LawyerProfile = ({ slug }: { slug: string }) => {
   }
 
   const totalRatings = RATING_KEYS.reduce((n, k) => n + lawyer.ratingBreakdown[k], 0);
-  const verifiedShare = lawyer.reviews.length
-    ? Math.round((lawyer.reviews.filter((r) => r.verifiedClient).length / lawyer.reviews.length) * 100)
+  const verifiedShare = published.length
+    ? Math.round((published.filter((r) => r.verifiedClient).length / published.length) * 100)
     : 0;
 
   return (
@@ -71,6 +73,16 @@ export const LawyerProfile = ({ slug }: { slug: string }) => {
       <button className="btn ghost sm" onClick={() => nav('/find')} style={{ marginBottom: 16 }}>
         <Icon.back size={15} /> All lawyers
       </button>
+
+      {!lawyer.listed && (
+        <div className="callout warn" style={{ marginBottom: 16 }} data-testid="suspended-notice">
+          <Icon.alert size={16} />
+          <span>
+            <strong>This profile is not currently listed.</strong> It has been suspended by the Law Den review team
+            and does not appear in search results. Reviews and credentials are kept on the record.
+          </span>
+        </div>
+      )}
 
       <header className="profile-head panel">
         <Avatar name={lawyer.name} tone={lawyer.tone} large />
@@ -255,8 +267,19 @@ export const LawyerProfile = ({ slug }: { slug: string }) => {
                     visibleReviews.map((r) => <ReviewRow key={r.id} review={r} />)
                   )}
 
+                  {removedCount > 0 && (
+                    <div className="callout warn" style={{ marginTop: 16 }} data-testid="removed-notice">
+                      <Icon.alert size={16} />
+                      <span>
+                        {removedCount} {removedCount === 1 ? 'review was' : 'reviews were'} removed for breaking the
+                        review policy. The rating above still counts every review this lawyer received — removing a
+                        review never raises a score.
+                      </span>
+                    </div>
+                  )}
+
                   <p className="tiny muted" style={{ marginTop: 14 }}>
-                    Showing the {lawyer.reviews.length} most recent reviews of {lawyer.reviewCount}. Ratings shown are the
+                    Showing the {published.length} most recent reviews of {lawyer.reviewCount}. Ratings shown are the
                     average of all reviews received.
                   </p>
                 </>

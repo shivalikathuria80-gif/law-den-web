@@ -6,14 +6,16 @@ import { Icon, Toast } from '../components/ui';
 import { Dashboard } from './admin/Dashboard';
 import { Lawyers } from './admin/Lawyers';
 import { Queue } from './admin/Queue';
+import { Reviews } from './admin/Reviews';
 import { Users } from './admin/Users';
 import { ADMIN_PASSCODE, useStore } from '../store';
 
-type Section = 'dashboard' | 'queue' | 'lawyers' | 'users' | 'activity';
+type Section = 'dashboard' | 'queue' | 'reviews' | 'lawyers' | 'users' | 'activity';
 
 const SECTIONS: { id: Section; label: string; icon: () => ReactElement }[] = [
   { id: 'dashboard', label: 'Dashboard', icon: () => <Icon.spark size={16} /> },
   { id: 'queue', label: 'Verification queue', icon: () => <Icon.doc size={16} /> },
+  { id: 'reviews', label: 'Review moderation', icon: () => <Icon.star size={16} /> },
   { id: 'lawyers', label: 'Lawyers', icon: () => <Icon.scales size={16} /> },
   { id: 'users', label: 'Public users', icon: () => <Icon.user size={16} /> },
   { id: 'activity', label: 'Activity log', icon: () => <Icon.clock size={16} /> },
@@ -160,6 +162,7 @@ export const AdminApp = () => {
             <Queue onToast={flash} />
           </>
         )}
+        {section === 'reviews' && <Reviews onToast={flash} />}
         {section === 'lawyers' && <Lawyers onToast={flash} />}
         {section === 'users' && <Users />}
         {section === 'activity' && (

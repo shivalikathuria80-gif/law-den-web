@@ -1,9 +1,10 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { BarList, LineChart, Sparkline, SERIES } from '../../components/charts';
 import { Icon } from '../../components/ui';
 import { OPS_QUEUE, SAMPLE_USERS, WEEKS } from '../../data/platform';
+import { isPromoted } from '../../lib/search';
 import { longDate } from '../../lib/format';
 import { readKnownUsers } from '../../auth';
 import { useStore } from '../../store';
@@ -19,14 +20,29 @@ const Kpi = ({
   </div>
 );
 
-export const Dashboard = ({ onGo }: { onGo: (section: 'queue' | 'users' | 'lawyers') => void }) => {
+const RANGES = [
+  { id: '4', label: '4 weeks' },
+  { id: '8', label: '8 weeks' },
+  { id: 'all', label: 'All' },
+] as const;
+
+export const Dashboard = ({ onGo }: { onGo: (section: 'queue' | 'users' | 'lawyers' | 'reviews') => void }) => {
   const { lawyers, submissions, audit } = useStore();
+  const [range, setRange] = useState<(typeof RANGES)[number]['id']>('8');
+
+  const weeks = useMemo(() => (range === 'all' ? WEEKS : WEEKS.slice(-Number(range))), [range]);
 
   const localUsers = useMemo(() => readKnownUsers(), []);
   const totalUsers = SAMPLE_USERS.length + localUsers.length;
   const pending = submissions.filter((s) => s.status === 'pending').length;
+  const changesRequested = submissions.filter((s) => s.status === 'changes-requested').length;
   const verified = lawyers.filter((l) => l.verified).length;
-  const promoted = lawyers.filter((l) => l.promoted).length;
+  const suspended = lawyers.filter((l) => !l.listed).length;
+  const disputedReviews = lawyers.reduce(
+    (n, l) => n + l.reviews.filter((r) => r.flag && !r.moderation).length, 0,
+  );
+  const removedReviews = lawyers.reduce((n, l) => n + l.reviews.filter((r) => r.moderation).length, 0);
+  const promoted = lawyers.filter((l) => isPromoted(l)).length;
   const reviews = lawyers.reduce((n, l) => n + l.reviewCount, 0);
   const rated = lawyers.filter((l) => l.rating !== null);
   const avgRating = rated.length ? rated.reduce((n, l) => n + (l.rating ?? 0), 0) / rated.length : 0;
@@ -59,7 +75,12 @@ export const Dashboard = ({ onGo }: { onGo: (section: 'queue' | 'users' | 'lawye
     return buckets;
   }, [lawyers]);
 
-  const labels = WEEKS.map((w) => w.label);
+  const labels = weeks.map((w) => w.label);
+
+  // Decision funnel over the selected range: what came in, what cleared, what is still open.
+  const submitted = weeks.reduce((n, w) => n + w.submissions, 0);
+  const published = weeks.reduce((n, w) => n + w.approvals, 0);
+  const clearanceRate = submitted ? Math.round((published / submitted) * 100) : 0;
 
   return (
     <>
@@ -70,19 +91,62 @@ export const Dashboard = ({ onGo }: { onGo: (section: 'queue' | 'users' | 'lawye
             Directory health, the review backlog and public-user activity. Week ending {longDate('2026-09-18')}.
           </p>
         </div>
-        {pending > 0 && (
-          <button className="btn sm" style={{ marginLeft: 'auto' }} onClick={() => onGo('queue')} data-testid="dash-to-queue">
-            Review {pending} pending {pending === 1 ? 'profile' : 'profiles'} <Icon.chevron size={14} />
-          </button>
-        )}
+        <div className="row gap-8" style={{ marginLeft: 'auto' }}>
+          <div className="segmented" role="group" aria-label="Time range">
+            {RANGES.map((r) => (
+              <button key={r.id} aria-pressed={range === r.id} onClick={() => setRange(r.id)} data-testid={`range-${r.id}`}>
+                {r.label}
+              </button>
+            ))}
+          </div>
+          {pending > 0 && (
+            <button className="btn sm" onClick={() => onGo('queue')} data-testid="dash-to-queue">
+              Review {pending} pending {pending === 1 ? 'profile' : 'profiles'} <Icon.chevron size={14} />
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="kpis" style={{ marginTop: 18 }}>
-        <Kpi label="Verified lawyers" value={String(verified)} delta={`${promoted} on promoted placement`} tone="flat" />
-        <Kpi label="Awaiting review" value={String(pending)} delta="Median decision time 2.4 days" tone="flat" />
-        <Kpi label="Registered users" value={totalUsers.toLocaleString('en-IN')} delta="+91 this week" trend={WEEKS.map((w) => w.signups)} />
+        <Kpi
+          label="Listed lawyers" value={String(verified - suspended)}
+          delta={suspended ? `${suspended} suspended · ${promoted} promoted` : `${promoted} on promoted placement`} tone="flat"
+        />
+        <Kpi label="Awaiting review" value={String(pending)} delta={`${changesRequested} awaiting the lawyer · median 2.4 days`} tone="flat" />
+        <Kpi label="Registered users" value={totalUsers.toLocaleString('en-IN')} delta="+91 this week" trend={weeks.map((w) => w.signups)} />
         <Kpi label="Client reviews" value={reviews.toLocaleString('en-IN')} delta={`Average ${avgRating.toFixed(2)} ★ across the directory`} tone="flat" />
       </div>
+
+      <div className="panel" style={{ marginTop: 16, padding: '18px 20px' }}>
+        <div className="row wrap gap-12" style={{ marginBottom: 12 }}>
+          <div>
+            <h3 style={{ fontSize: 15 }}>Verification funnel</h3>
+            <p className="sub" style={{ fontSize: 12.5, color: 'var(--muted)', marginTop: 3 }}>
+              Over the selected range. A profile can only leave the queue through a recorded decision.
+            </p>
+          </div>
+          <span className="badge neutral" style={{ marginLeft: 'auto' }}>{clearanceRate}% cleared</span>
+        </div>
+        <BarList
+          items={[
+            { label: 'Submitted', value: submitted },
+            { label: 'Published', value: published },
+            { label: 'Open now', value: pending },
+            { label: 'With the lawyer', value: changesRequested },
+          ]}
+        />
+      </div>
+
+      {(disputedReviews > 0 || removedReviews > 0) && (
+        <div className="callout gold" style={{ marginTop: 16 }} data-testid="moderation-callout">
+          <Icon.alert size={16} />
+          <span>
+            {disputedReviews} disputed {disputedReviews === 1 ? 'review is' : 'reviews are'} waiting on a decision
+            {removedReviews > 0 && `, and ${removedReviews} ${removedReviews === 1 ? 'has' : 'have'} been removed under the review policy`}.{' '}
+            <button className="btn ghost sm" onClick={() => onGo('reviews')} data-testid="dash-to-reviews">Open moderation →</button>
+          </span>
+        </div>
+      )}
 
       <div className="chart-grid">
         <div className="card chart-card">
@@ -93,8 +157,8 @@ export const Dashboard = ({ onGo }: { onGo: (section: 'queue' | 'users' | 'lawye
           <LineChart
             labels={labels}
             series={[
-              { key: 'sub', label: 'Submitted', color: SERIES.primary, values: WEEKS.map((w) => w.submissions) },
-              { key: 'app', label: 'Published', color: SERIES.secondary, values: WEEKS.map((w) => w.approvals) },
+              { key: 'sub', label: 'Submitted', color: SERIES.primary, values: weeks.map((w) => w.submissions) },
+              { key: 'app', label: 'Published', color: SERIES.secondary, values: weeks.map((w) => w.approvals) },
             ]}
           />
         </div>
@@ -120,8 +184,8 @@ export const Dashboard = ({ onGo }: { onGo: (section: 'queue' | 'users' | 'lawye
           <LineChart
             labels={labels}
             series={[
-              { key: 'signups', label: 'Sign-ups', color: SERIES.primary, values: WEEKS.map((w) => w.signups) },
-              { key: 'enq', label: 'Enquiries', color: SERIES.secondary, values: WEEKS.map((w) => w.enquiries) },
+              { key: 'signups', label: 'Sign-ups', color: SERIES.primary, values: weeks.map((w) => w.signups) },
+              { key: 'enq', label: 'Enquiries', color: SERIES.secondary, values: weeks.map((w) => w.enquiries) },
             ]}
           />
         </div>
@@ -143,7 +207,11 @@ export const Dashboard = ({ onGo }: { onGo: (section: 'queue' | 'users' | 'lawye
           </header>
           <div className="stack gap-8">
             {OPS_QUEUE.map((o) => (
-              <div className="row gap-10 card" key={o.id} style={{ padding: 12 }}>
+              <button
+                className="row gap-10 card" key={o.id} style={{ padding: 12, width: '100%', textAlign: 'left', cursor: 'pointer' }}
+                data-testid={`ops-${o.kind}`}
+                onClick={() => onGo(o.kind === 'review-flag' ? 'reviews' : o.kind === 'profile-edit' ? 'queue' : 'lawyers')}
+              >
                 <span className={`cred-icon${o.priority === 'high' ? ' rejected' : ' pending'}`}>
                   {o.kind === 'review-flag' ? <Icon.alert size={15} /> : o.kind === 'fee-change' ? <Icon.doc size={15} /> : <Icon.spark size={15} />}
                 </span>
@@ -152,7 +220,7 @@ export const Dashboard = ({ onGo }: { onGo: (section: 'queue' | 'users' | 'lawye
                   <span className="tiny muted">{o.detail}</span>
                 </div>
                 <span className="tiny muted" style={{ marginLeft: 'auto', whiteSpace: 'nowrap' }}>{longDate(o.raised)}</span>
-              </div>
+              </button>
             ))}
           </div>
         </div>
@@ -184,8 +252,9 @@ export const Dashboard = ({ onGo }: { onGo: (section: 'queue' | 'users' | 'lawye
       </div>
 
       <p className="tiny muted" style={{ marginTop: 18 }}>
-        Weekly figures, sample users and the decision queue are demonstration data. Lawyer counts, ratings, review
-        totals and the activity log are computed live from the directory you are administering.
+        Weekly figures, sample users and the decision queue are demonstration data. Lawyer counts, listing status,
+        placement, ratings, review totals, moderation counts and the activity log are computed live from the
+        directory you are administering.
       </p>
     </>
   );

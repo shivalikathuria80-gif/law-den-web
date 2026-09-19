@@ -92,8 +92,14 @@ const recommendedScore = (l: Lawyer): number => {
   return rating * 1.6 + confidence * 1.1 + freshness + responsiveness;
 };
 
+/** Placement lapses on its end date without anyone having to switch it off. */
+export const isPromoted = (l: Lawyer, today = new Date().toISOString().slice(0, 10)): boolean =>
+  l.promoted && l.listed && (!l.promotedUntil || l.promotedUntil >= today);
+
 export const applyFilters = (lawyers: Lawyer[], f: Filters): Lawyer[] => {
   const filtered = lawyers.filter((l) => {
+    // A suspended profile is out of the directory entirely.
+    if (!l.listed) return false;
     if (f.verifiedOnly && !l.verified) return false;
     if (f.acceptingOnly && !l.acceptsNewClients) return false;
     if (!matchesQuery(l, f.query)) return false;

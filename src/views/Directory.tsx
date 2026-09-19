@@ -6,7 +6,7 @@ import { FiltersPanel } from '../components/Filters';
 import { LawyerCard } from '../components/LawyerCard';
 import { Icon, InfoTip } from '../components/ui';
 import { LANGUAGES } from '../data/seed';
-import { applyFilters, defaultFilters, isDefaultFilters, SORT_LABELS, type Filters, type SortKey } from '../lib/search';
+import { applyFilters, defaultFilters, isDefaultFilters, isPromoted, SORT_LABELS, type Filters, type SortKey } from '../lib/search';
 import { useNav } from '../lib/nav';
 import { useStore } from '../store';
 
@@ -34,7 +34,7 @@ export const Directory = () => {
   );
 
   const results = useMemo(() => applyFilters(lawyers, filters), [lawyers, filters]);
-  const promoted = useMemo(() => results.filter((l) => l.promoted), [results]);
+  const promoted = useMemo(() => results.filter((l) => isPromoted(l)), [results]);
 
   // Brief skeleton pass so that filter changes read as a deliberate, snappy transition.
   useEffect(() => {

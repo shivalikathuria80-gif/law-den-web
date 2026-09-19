@@ -42,7 +42,7 @@ const rev = (
   response?: { body: string; date: string },
 ): Review => ({ id, author, rating, date, matter, body, verifiedClient, helpful, response });
 
-type Seed = Omit<Lawyer, 'ratingBreakdown'> & { ratingBreakdown?: Record<1 | 2 | 3 | 4 | 5, number> };
+type Seed = Omit<Lawyer, 'ratingBreakdown' | 'listed'> & { ratingBreakdown?: Record<1 | 2 | 3 | 4 | 5, number> };
 
 const seeds: Seed[] = [
   {
@@ -533,8 +533,30 @@ const seeds: Seed[] = [
 
 export const SEED_LAWYERS: Lawyer[] = seeds.map((s) => ({
   ...s,
+  listed: true,
   ratingBreakdown: s.ratingBreakdown ?? breakdown(s.rating ?? 4.5, s.reviewCount),
 }));
+
+// Two reviews arrive disputed, so the moderation queue has real work in it.
+const flagReview = (lawyerSlug: string, reviewId: string, flag: NonNullable<Review['flag']>) => {
+  const lawyer = SEED_LAWYERS.find((l) => l.slug === lawyerSlug);
+  const review = lawyer?.reviews.find((r) => r.id === reviewId);
+  if (review) review.flag = flag;
+};
+
+flagReview('rahul-verma', 'r4', {
+  reason: 'not-a-client',
+  raisedBy: 'Rahul Verma',
+  raisedOn: '2026-09-17',
+  detail: 'Says no consultation was booked under this name and asks for the review to be taken down.',
+});
+
+flagReview('vikram-desai', 'r4', {
+  reason: 'confidential',
+  raisedBy: 'Vikram Desai',
+  raisedOn: '2026-09-16',
+  detail: 'Mentions details of a matter that is still before the court.',
+});
 
 export const SEED_SUBMISSIONS: Submission[] = [
   {
